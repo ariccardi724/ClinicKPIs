@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#03122B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Clinic Tracker">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Clinic Staffing Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#03122B; --surface:#0A1F45; --surface-2:#0E2A57; --ink:#E8F2FF; --ink-2:#93ACD3;
+  --line:#1F3D73; --teal:#4DF5A0; --teal-soft:rgba(77,245,160,.14); --plum:#FF6B8E; --plum-soft:rgba(255,107,142,.16);
+  --gold:#3D8BFF; --gold-soft:rgba(61,139,255,.16); --cyan:#3FD4E0; --focus:#4DF5A0;
+  --glass:rgba(10,31,69,.72); --glow:0 0 0 1px rgba(77,245,160,.08), 0 10px 30px rgba(0,0,0,.35);
+  --r-lg:18px; --r-md:12px; --r-sm:8px;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{background:
+  radial-gradient(900px 600px at 0% 0%, rgba(61,139,255,.22), transparent 60%),
+  radial-gradient(800px 600px at 100% 100%, rgba(77,245,160,.14), transparent 60%),
+  var(--bg);background-attachment:fixed;min-height:100vh}
+body{font-family:"Schibsted Grotesk",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.side{padding:24px 18px;border-right:1px solid var(--line);background:linear-gradient(180deg,rgba(14,42,87,.85),rgba(3,18,43,.6));backdrop-filter:blur(8px);display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:18px;letter-spacing:-.01em;line-height:1.15}
+.brand img{width:52px;height:52px;flex:none;filter:drop-shadow(0 0 10px rgba(77,245,160,.35)) drop-shadow(0 0 18px rgba(61,139,255,.3))}
+.brand .t{background:linear-gradient(90deg,#4DF5A0,#3FD4E0 55%,#3D8BFF);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand small{display:block;font-weight:500;font-size:13px;color:var(--ink-2);margin-top:3px;letter-spacing:0;-webkit-text-fill-color:var(--ink-2)}
+.side label.lbl{font-size:13px;color:var(--ink-2);display:block;margin-bottom:6px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:var(--r-sm);font-weight:500;color:var(--ink-2)}
+.nav button:hover{background:var(--surface-2);color:var(--ink)}
+.nav button[aria-current="page"]{background:var(--teal-soft);color:var(--teal);font-weight:700;box-shadow:inset 3px 0 0 var(--teal)}
+.nav button:focus-visible{outline:2px solid var(--focus)}
+.side .foot{margin-top:auto;font-size:12.5px;color:var(--ink-2)}
+
+main{padding:28px max(32px, env(safe-area-inset-right)) 60px max(32px, env(safe-area-inset-left));min-width:0;max-width:1280px}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}
+h1{font-size:30px;line-height:1.1;margin:0;font-weight:800;letter-spacing:-.02em}
+h2{font-size:16px;margin:0 0 4px;font-weight:700}
+.sub{color:var(--ink-2);font-size:14px;margin:4px 0 0}
+.muted{color:var(--ink-2)}
+
+select,input[type=text],input[type=number],input[type=date],input[type=month],textarea{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;width:100%}
+textarea{min-height:70px;resize:vertical}
+input[type=number]{text-align:right}
+input,select,textarea{font-size:16px}  /* stops iPhone zooming in on tap */
+.btn{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 16px;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--ink-2)}
+.btn.primary{background:linear-gradient(90deg,#4DF5A0,#3FD4E0);color:#03122B;border-color:transparent;box-shadow:0 0 16px rgba(77,245,160,.3)}
+.btn.danger{color:var(--plum)}
+.btn.icon{padding:8px 12px;line-height:1}
+.btn:disabled{opacity:.4;cursor:default}
+
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{all:unset;cursor:pointer;padding:6px 14px;border-radius:999px;font-weight:600;font-size:14px;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:linear-gradient(90deg,#4DF5A0,#3FD4E0);color:#03122B}
+.seg button:focus-visible{outline:2px solid var(--focus)}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.plabel{font-weight:700;min-width:170px;text-align:center}
+
+/* headline band */
+.band{display:grid;grid-template-columns:1.3fr repeat(4,1fr);background:var(--glass);box-shadow:var(--glow);backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:var(--r-lg);margin-bottom:18px}
+.band > div{padding:18px 20px;border-left:1px solid var(--line)}
+.band > div:first-child{border-left:0}
+.band .k{font-size:13px;color:var(--ink-2)}
+.band .v{font-size:26px;font-weight:700;letter-spacing:-.01em;margin-top:2px}
+.band .hero .v{font-size:52px;font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--teal);text-shadow:0 0 22px rgba(77,245,160,.45)}
+.band .d{font-size:13px;color:var(--ink-2);margin-top:4px}
+.pill{display:inline-block;font-size:12.5px;font-weight:700;border-radius:999px;padding:2px 9px;margin-top:6px}
+.pill.under{background:var(--teal-soft);color:var(--teal)}
+.pill.over{background:var(--plum-soft);color:var(--plum)}
+.pill.even{background:var(--surface-2);color:var(--ink-2)}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.panel{background:var(--glass);box-shadow:var(--glow);backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px}
+.panel.wide{grid-column:1/-1}
+.panel .hd{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}
+.panel .hd p{margin:0;font-size:13px;color:var(--ink-2)}
+.cbox{position:relative;height:230px}
+.cbox.tall{height:290px}
+
+/* sheet table */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md)}
+table.sheet{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+.sheet th,.sheet td{padding:7px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.sheet th:first-child,.sheet td:first-child{text-align:left;position:sticky;left:0;background:#0A1F45;z-index:1}
+.sheet thead th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--ink-2)}
+.sheet thead th:first-child{background:var(--surface-2)}
+.sheet td.tot,.sheet th.tot{font-weight:700;background:var(--surface-2)}
+.sheet tr.grp td{background:var(--surface-2);font-weight:700;font-size:13px;color:var(--ink-2)}
+.sheet tr.grp td:first-child{background:var(--surface-2)}
+.sheet tr.indent td:first-child{padding-left:26px}
+.neg{color:var(--teal)} .pos{color:var(--plum)}
+.sheet tr:last-child td{border-bottom:0}
+
+/* daily log */
+.weekstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:18px}
+.weekstrip button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-md);padding:10px 6px;text-align:center}
+.weekstrip button .dn{font-size:12.5px;color:var(--ink-2)}
+.weekstrip button .dd{font-size:20px;font-weight:700}
+.weekstrip button .dp{font-size:12px;color:var(--ink-2);min-height:16px}
+.weekstrip button.has .dp{color:var(--teal);font-weight:600}
+.weekstrip button[aria-current="date"]{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal),0 0 14px rgba(77,245,160,.35)}
+.logcols{display:grid;grid-template-columns:1fr 330px;gap:18px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:18px}
+.fields2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:5px}
+.field input{font-size:20px;font-weight:700;padding:10px 12px}
+.staffrows{display:grid;grid-template-columns:1fr 96px 96px;gap:6px 10px;align-items:center}
+.staffrows .h{font-size:12.5px;color:var(--ink-2);text-align:right}
+.staffrows .h:first-child{text-align:left}
+.staffrows .nm{font-weight:600}
+.staffrows .nm.arch{color:var(--ink-2);font-weight:500}
+.staffrows .totrow{font-weight:700;border-top:1px solid var(--line);padding-top:8px;margin-top:4px}
+.staffrows .totval{text-align:right;font-weight:700;padding:8px 10px}
+.hint{font-size:12.5px;color:var(--ink-2);margin-top:8px}
+.summary{position:sticky;top:20px}
+.meter{margin:12px 0 4px}
+.meter .row{display:flex;justify-content:space-between;font-size:14px}
+.meter .row b{font-size:18px}
+.bar{position:relative;height:12px;background:var(--surface-2);border-radius:999px;margin-top:8px;overflow:hidden}
+.bar .allow{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);box-shadow:0 0 6px var(--ink)}
+.bar .fill{position:absolute;top:0;bottom:0;left:0;border-radius:999px}
+.divider{height:1px;background:var(--line);margin:16px 0}
+.saved{font-size:13px;color:var(--ink-2);min-height:18px}
+
+/* staff + settings */
+.list{display:flex;flex-direction:column}
+.list .it{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.list .it:last-child{border-bottom:0}
+.toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2)}
+.addrow{display:grid;grid-template-columns:1fr 160px auto;gap:10px}
+.form{display:grid;gap:14px;max-width:520px}
+.census .it{grid-template-columns:1fr 120px auto}
+.empty{text-align:center;padding:46px 20px}
+.drop{text-align:center;padding:34px 20px;border-style:dashed;border-width:2px;border-color:#2C5A9E}
+.drop.over{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal),0 0 24px rgba(77,245,160,.25)}
+.fields3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.fields3 select,.fields3 input{font-size:15px}
+.sheet.imp select{width:auto;min-width:150px;padding:5px 8px}
+.sheet.imp td,.sheet.imp th{text-align:left}
+.applybar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-top:14px}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--ink-2);margin-bottom:10px}
+.legend i{display:inline-block;width:14px;height:10px;border:2px solid;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.legend i.nw{background:rgba(3,18,43,.5);border-color:#8BCEA5}
+.overlaywrap{overflow:auto;max-height:75vh;border-radius:var(--r-md);border:1px solid var(--line);background:#fff}
+#impCanvas{display:block;width:100%;min-width:640px;cursor:pointer}
+details summary{cursor:pointer;font-weight:600}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+#hwText{font-variant-numeric:tabular-nums}
+.empty p{color:var(--ink-2);margin:6px 0 16px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--surface);padding:10px 18px;border-radius:999px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:9}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.loading{padding:60px;color:var(--ink-2)}
+
+@media (max-width:1100px){
+  .band{grid-template-columns:repeat(3,1fr)}
+  .band > div:nth-child(4){border-left:0}
+  .band > div:nth-child(n+4){border-top:1px solid var(--line)}
+}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{position:sticky;top:0;z-index:7;height:auto;border-right:0;border-bottom:1px solid var(--line);backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(90deg,rgba(14,42,87,.97),rgba(6,26,60,.97));padding:calc(14px + env(safe-area-inset-top)) 16px 14px;gap:10px;flex-direction:row;align-items:center;justify-content:space-between}
+  .side > div:nth-child(2){min-width:0;max-width:52%}
+  .side label.lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .brand small{display:none}
+  .brand img{width:40px;height:40px}
+  .brand{font-size:17px}
+  .nav{position:fixed;left:0;right:0;bottom:0;z-index:8;flex-direction:row;justify-content:space-around;gap:0;
+       background:rgba(6,22,52,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  .nav button{flex:1;text-align:center;padding:10px 4px;font-size:13.5px}
+  .nav button[aria-current="page"]{box-shadow:inset 0 2px 0 var(--teal)}
+  main{padding-bottom:calc(90px + env(safe-area-inset-bottom))!important}
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+  .side .foot{display:none}
+  main{padding:20px max(16px, env(safe-area-inset-right)) 50px max(16px, env(safe-area-inset-left))}
+  .grid,.logcols{grid-template-columns:1fr}
+  .summary{position:static}
+  .band{grid-template-columns:1fr 1fr}
+  .band > div{border-left:0!important;border-top:1px solid var(--line)}
+  .band > div:first-child{grid-column:1/-1;border-top:0}
+  h1{font-size:25px}
+  .top{align-items:stretch}
+  .top .ctrl{width:100%}
+  .top .ctrl .seg{flex:1 1 100%;display:flex}
+  .seg button{flex:1;text-align:center;padding:8px 6px}
+  #csvBtn{margin-left:auto}
+  #dateIn{flex:1}
+  .addrow{grid-template-columns:1fr}
+  .fields3{grid-template-columns:1fr}
+  .nav button{font-size:12.5px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><img src="icons/icon-96.png" alt="" width="52" height="52"><div><span class="t">Clinic Staffing</span><small>Hours, patients, and budget</small></div></div>
+    <div>
+      <label class="lbl" for="clinicSel">Clinic</label>
+      <select id="clinicSel"></select>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-v="dash">Dashboard</button>
+      <button data-v="log">Daily log</button>
+      <button data-v="import">Import</button>
+      <button data-v="staff">Staff</button>
+      <button data-v="settings">Settings</button>
+    </nav>
+    <div class="foot" id="footNote"></div>
+  </aside>
+  <main id="main"><div class="loading">Loading your clinic data…</div></main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ---------- utilities ---------- */
+const KEY = 'clinic-tracker:data';
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,'0');
+const dkey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = k => { const [y,m,d] = k.split('-').map(Number); return new Date(y,m-1,d); };
+const addDays = (d,n) => { const x = new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()+n); return x; };
+const startOfWeek = d => addDays(d, -((d.getDay()+6)%7));
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const md = d => `${d.getMonth()+1}/${d.getDate()}`;
+const uid = () => Math.random().toString(36).slice(2,9);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+const f1 = n => (Math.round(n*10)/10).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1});
+const f0 = n => Math.round(n).toLocaleString();
+const f2 = n => (Math.round(n*100)/100).toFixed(2);
+const signed = n => { const r = Math.round(n*10)/10; return r === 0 ? '0.0' : (r > 0 ? '+' : '−') + f1(Math.abs(r)); };
+const varCls = n => { const r = Math.round(n*10)/10; return r > 0 ? 'pos' : r < 0 ? 'neg' : ''; };
+function varPill(n){
+  const r = Math.round(n*10)/10;
+  if (r > 0) return `<span class="pill over">${f1(r)} hrs over</span>`;
+  if (r < 0) return `<span class="pill under">${f1(-r)} hrs under</span>`;
+  return `<span class="pill even">On budget</span>`;
+}
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 1800); }
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function rgba(hex,a){ hex = hex.replace('#',''); if (hex.length===3) hex = hex.split('').map(x=>x+x).join(''); const n = parseInt(hex,16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+
+/* ---------- sample data from the spreadsheet ---------- */
+function seedClinic(){
+  const staffNames = [
+    ['Alex','clinician'],['Amy','clinician'],['Jeremy','clinician'],['Olivia','clinician'],['Ray','clinician'],
+    ['Makaiya','aide'],['Malik','aide'],['Emma','aide'],['Morgan','aide'],['Sabrina','aide'],['Brynn','aide'],['Alana','aide'],['Leah','aide']
+  ];
+  const staff = staffNames.map(([name,role]) => ({id:uid(), name, role, active:true}));
+  const sid = n => staff.find(s=>s.name===n).id;
+  const entries = {};
+  // Weeks imported as daily totals (Mon–Sat). null = closed / no entry.
+  const weeks = [
+    ['2026-07-27',[19,26.5,20,24,16,11],[56,59,53,59,40,18],[0,6,3,1,4,2],[13,8,8,6,6,8]],
+    ['2026-08-03',[20,31,17.5,23,13.5,9.5],[52,60,44,65,31,17],[2,5,1,2,0,2],[8,8,13,15,10,0]],
+    ['2026-08-10',[19,26,19,24.5,9,6],[51,64,49,51,32,19],[3,3,3,4,0,0],[8,18,8,12,8,4]],
+    ['2026-08-17',[18,31,20.5,22.5,16,7],[49,58,52,56,32,18],[4,7,4,2,3,0],[10.5,13,12,12,6,4]],
+    ['2026-08-24',[21.5,30.5,20.5,23,16,10],[51,64,45,50,37,18],[5,4,5,2,4,3],[8,12,8,11,7,0]],
+    ['2026-08-31',[20.5,29.5,20,28,8.5,4.5],[41,61,47,55,26,17],[2,3,6,3,1,0],[8,11,8,11,6,4]],
+    ['2026-09-07',[null,25.5,17.5,33,16.5,10],[null,65,39,62,29,23],[null,4,3,8,3,1],[null,12,9,0,0,0]],
+    ['2026-09-14',[18.5,30.5,20,32,15,4],[45,68,47,58,35,24],[3,3,6,3,2,3],[8,13,8.5,14,5,0]],
+    ['2026-09-21',[18.5,31,19.5,34.5,13,4.5],[42,71,44,58,29,0],[5,4,5,2,0,15],[8,12,8,11.5,0,4]],
+    ['2026-09-28',[18,31.5,18.5,22.5,17,9],[41,73,49,57,32,19],[4,6,3,2,5,1],[8,12,8,16,8,4]],
+  ];
+  weeks.forEach(([start,clin,pts,nps,aide]) => {
+    for (let i=0;i<6;i++){
+      if (pts[i] === null) continue;
+      entries[dkey(addDays(parse(start),i))] = {pts:pts[i], nps:nps[i], clinOverride:clin[i], aideOverride:aide[i], staff:{}, notes:''};
+    }
+  });
+  // Week of 10/5 entered person-by-person
+  const w = {
+    pts:[39,69,40,50,39,14], nps:[3,6,5,1,4,1],
+    people:{Alex:[10,13,10,13,9,5],Amy:[8,8,4,7,0,0],Jeremy:[0,7,8,0,7,0],Olivia:[0,3,0,1,0,3],
+            Malik:[8,0,0,0,0,0],Sabrina:[0,12,0,0,0,0],Makaiya:[0,0,8,8,8,0]}
+  };
+  for (let i=0;i<6;i++){
+    const st = {};
+    for (const [n,h] of Object.entries(w.people)) if (h[i]) st[sid(n)] = {h:h[i], pto:0};
+    entries[dkey(addDays(parse('2026-10-05'),i))] = {pts:w.pts[i], nps:w.nps[i], staff:st, notes:''};
+  }
+  return {
+    id:uid(), name:'Clinic 1',
+    settings:{ptsPerClinHr:1.8, aideHrsPerPt:0.3},
+    census:{'2026-07':210,'2026-08':210,'2026-09':210,'2026-10':210},
+    staff, entries
+  };
+}
+function blankClinic(name){
+  return {id:uid(), name, settings:{ptsPerClinHr:1.8, aideHrsPerPt:0.3}, census:{}, staff:[], entries:{}};
+}
+
+/* ---------- state + storage ---------- */
+let state = null;
+const ui = { view:'dash', ptype:'week', anchor:new Date(), logDate:dkey(new Date()) };
+const charts = [];
+const clinic = () => state.clinics.find(c=>c.id===state.activeId) || state.clinics[0];
+
+const store = {
+  async get(){
+    if (window.storage){ try { const r = await window.storage.get(KEY,false); return r && r.value; } catch(e){ return null; } }
+    return window.localStorage.getItem(KEY);
+  },
+  async set(v){
+    if (window.storage) return window.storage.set(KEY, v, false);
+    window.localStorage.setItem(KEY, v);
+  }
+};
+async function load(){
+  try { const v = await store.get(); if (v) return JSON.parse(v); } catch(e){ console.error(e); }
+  return null;
+}
+let saveTimer;
+function persist(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try { await store.set(JSON.stringify(state)); }
+    catch(e){ console.error('Storage error', e); toast('Could not save. Download a backup from Settings to keep your entries.'); }
+  }, 350);
+}
+
+/* ---------- calculations ---------- */
+function dayCalc(c, k){
+  const e = c.entries[k]; if (!e) return null;
+  let sc=0, sa=0, pc=0, pa=0; const byStaff = {};
+  for (const [id,v] of Object.entries(e.staff||{})){
+    const s = c.staff.find(x=>x.id===id); if (!s) continue;
+    const h = num(v.h), p = num(v.pto);
+    if (s.role==='clinician'){ sc+=h; pc+=p; } else { sa+=h; pa+=p; }
+    if (h||p) byStaff[id] = {h,p};
+  }
+  const clin = sc>0 ? sc : num(e.clinOverride);
+  const aide = sa>0 ? sa : num(e.aideOverride);
+  const pts = num(e.pts), nps = num(e.nps);
+  const rate = num(c.settings.ptsPerClinHr) || 1;
+  const allowClin = pts / rate, allowAide = pts * num(c.settings.aideHrsPerPt);
+  return {pts,nps,clin,aide,allowClin,allowAide,overClin:clin-allowClin,overAide:aide-allowAide,
+          ptoClin:pc,ptoAide:pa,payClin:clin+pc,payAide:aide+pa,byStaff};
+}
+function aggRange(c, start, end){
+  const t = {pts:0,nps:0,clin:0,aide:0,allowClin:0,allowAide:0,overClin:0,overAide:0,ptoClin:0,ptoAide:0,payClin:0,payAide:0,byStaff:{},days:0};
+  for (let d = new Date(start); d <= end; d = addDays(d,1)){
+    const r = dayCalc(c, dkey(d)); if (!r) continue;
+    t.days++;
+    for (const k of ['pts','nps','clin','aide','allowClin','allowAide','overClin','overAide','ptoClin','ptoAide','payClin','payAide']) t[k]+=r[k];
+    for (const [id,v] of Object.entries(r.byStaff)){ t.byStaff[id] = t.byStaff[id] || {h:0,p:0}; t.byStaff[id].h+=v.h; t.byStaff[id].p+=v.p; }
+  }
+  return t;
+}
+function periodInfo(type, a){
+  const y = a.getFullYear(), m = a.getMonth(); let start, end, label, buckets = [];
+  if (type==='week'){
+    start = startOfWeek(a); end = addDays(start,6);
+    label = `Week of ${MONTHS[start.getMonth()]} ${start.getDate()}, ${start.getFullYear()}`;
+    for (let i=0;i<7;i++){ const d = addDays(start,i); buckets.push({label:`${DOW[d.getDay()]} ${md(d)}`, start:d, end:d, sunday:d.getDay()===0}); }
+  } else if (type==='month'){
+    start = new Date(y,m,1); end = new Date(y,m+1,0);
+    label = `${new Date(y,m,1).toLocaleString(undefined,{month:'long'})} ${y}`;
+    for (let ws = startOfWeek(start); ws <= end; ws = addDays(ws,7)){
+      const bs = ws < start ? start : ws, we = addDays(ws,6), be = we > end ? end : we;
+      buckets.push({label:`Wk of ${md(ws)}`, start:bs, end:be});
+    }
+  } else if (type==='quarter'){
+    const q = Math.floor(m/3); start = new Date(y,q*3,1); end = new Date(y,q*3+3,0);
+    label = `Q${q+1} ${y}`;
+    for (let i=0;i<3;i++) buckets.push({label:MONTHS[q*3+i], start:new Date(y,q*3+i,1), end:new Date(y,q*3+i+1,0)});
+  } else {
+    start = new Date(y,0,1); end = new Date(y,11,31); label = String(y);
+    for (let i=0;i<12;i++) buckets.push({label:MONTHS[i], start:new Date(y,i,1), end:new Date(y,i+1,0)});
+  }
+  return {start,end,label,buckets};
+}
+function shiftAnchor(dir){
+  const a = ui.anchor;
+  if (ui.ptype==='week') ui.anchor = addDays(a, 7*dir);
+  else if (ui.ptype==='month') ui.anchor = new Date(a.getFullYear(), a.getMonth()+dir, 1);
+  else if (ui.ptype==='quarter') ui.anchor = new Date(a.getFullYear(), a.getMonth()+3*dir, 1);
+  else ui.anchor = new Date(a.getFullYear()+dir, 0, 1);
+}
+function censusFor(c, d){
+  const ym = `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  const keys = Object.keys(c.census||{}).filter(k=>k<=ym).sort();
+  return keys.length ? c.census[keys[keys.length-1]] : null;
+}
+function latestEntryDate(c){
+  const ks = Object.keys(c.entries).sort(); return ks.length ? parse(ks[ks.length-1]) : new Date();
+}
+
+/* ---------- shell ---------- */
+function renderShell(){
+  const sel = $('#clinicSel');
+  sel.innerHTML = state.clinics.map(c=>`<option value="${c.id}" ${c.id===state.activeId?'selected':''}>${esc(c.name)}</option>`).join('');
+  document.querySelectorAll('#nav button').forEach(b => b.setAttribute('aria-current', b.dataset.v===ui.view ? 'page' : 'false'));
+  const c = clinic();
+  $('#footNote').innerHTML = `Allowed clinician hours = patients ÷ ${c.settings.ptsPerClinHr}<br>Allowed aide hours = patients × ${c.settings.aideHrsPerPt}`;
+}
+function render(){
+  charts.splice(0).forEach(ch=>ch.destroy());
+  renderShell();
+  ({dash:renderDashboard, log:renderLog, import:renderImport, staff:renderStaff, settings:renderSettings})[ui.view]();
+  window.scrollTo({top:0});
+}
+function go(view){ ui.view = view; render(); }
+
+/* ---------- dashboard ---------- */
+function renderDashboard(){
+  const c = clinic(); const p = periodInfo(ui.ptype, ui.anchor);
+  let buckets = p.buckets.map(b => ({...b, ...aggRange(c,b.start,b.end)}));
+  if (ui.ptype==='week') buckets = buckets.filter(b => !b.sunday || b.days>0);
+  const t = aggRange(c, p.start, p.end);
+  const census = censusFor(c, p.end);
+  const types = [['week','Week'],['month','Month'],['quarter','Quarter'],['year','Year']];
+  const head = `
+    <div class="top">
+      <div><h1>${esc(c.name)}</h1><p class="sub">${esc(p.label)}</p></div>
+      <div class="ctrl">
+        <div class="seg" role="group" aria-label="Report period">${types.map(([v,l])=>`<button data-pt="${v}" aria-pressed="${ui.ptype===v}">${l}</button>`).join('')}</div>
+        <button class="btn icon" id="prevP" aria-label="Previous period">‹</button>
+        <button class="btn" id="todayP">Latest</button>
+        <button class="btn icon" id="nextP" aria-label="Next period">›</button>
+        <button class="btn" id="csvBtn" ${t.days?'':'disabled'}>Export CSV</button>
+      </div>
+    </div>`;
+  if (!t.days){
+    $('#main').innerHTML = head + `<div class="panel empty"><h2>Nothing logged for ${esc(p.label)}</h2><p>Log a day to see hours, patients, and budget for this period.</p><button class="btn primary" id="goLog">Open daily log</button></div>`;
+    bindDashControls(c, p, buckets, t);
+    $('#goLog').onclick = () => { ui.logDate = dkey(p.start); go('log'); };
+    return;
+  }
+  const ppch = t.clin ? t.pts / t.clin : 0;
+  $('#main').innerHTML = head + `
+    <section class="band" aria-label="Period summary">
+      <div class="hero"><div class="k">Patients seen</div><div class="v">${f0(t.pts)}</div><div class="d">${f0(t.nps)} new patients across ${t.days} ${t.days===1?'day':'days'}</div></div>
+      <div><div class="k">Clinician hours</div><div class="v">${f1(t.clin)}</div><div class="d">of ${f1(t.allowClin)} allowed</div>${varPill(t.overClin)}</div>
+      <div><div class="k">Aide hours</div><div class="v">${f1(t.aide)}</div><div class="d">of ${f1(t.allowAide)} allowed</div>${varPill(t.overAide)}</div>
+      <div><div class="k">Patients per clinician hour</div><div class="v">${f2(ppch)}</div><div class="d">Target ${c.settings.ptsPerClinHr}</div></div>
+      <div><div class="k">Census</div><div class="v">${census ?? '—'}</div><div class="d">${census ? 'Active patients' : 'Add it in Settings'}</div></div>
+    </section>
+    <div class="grid">
+      <section class="panel"><div class="hd"><h2>Clinician hours vs allowed</h2><p>Above zero is over budget</p></div><div class="cbox"><canvas id="cVarC" aria-label="Clinician hours over or under allowed"></canvas></div></section>
+      <section class="panel"><div class="hd"><h2>Aide hours vs allowed</h2><p>Above zero is over budget</p></div><div class="cbox"><canvas id="cVarA" aria-label="Aide hours over or under allowed"></canvas></div></section>
+      <section class="panel wide"><div class="hd"><h2>Hours worked and allowed</h2><p>Solid bars are worked, light bars are allowed</p></div><div class="cbox tall"><canvas id="cHours" aria-label="Hours worked and allowed"></canvas></div></section>
+      <section class="panel"><div class="hd"><h2>Patients</h2><p>Total seen and new patients</p></div><div class="cbox"><canvas id="cPts" aria-label="Patients seen and new patients"></canvas></div></section>
+      <section class="panel"><div class="hd"><h2>Hours by person</h2><p>${Object.keys(t.byStaff).length ? 'From days logged person by person' : 'Log hours by person to see this'}</p></div><div class="cbox"><canvas id="cStaff" aria-label="Hours by staff member"></canvas></div></section>
+    </div>
+    <section class="panel">
+      <div class="hd"><h2>Report</h2><p>Same layout as your spreadsheet</p></div>
+      <div class="tablewrap">${sheetTable(c, buckets, t).html}</div>
+    </section>`;
+  bindDashControls(c, p, buckets, t);
+  drawCharts(c, buckets, t);
+}
+function bindDashControls(c, p, buckets, t){
+  document.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { ui.ptype = b.dataset.pt; render(); });
+  $('#prevP').onclick = () => { shiftAnchor(-1); render(); };
+  $('#nextP').onclick = () => { shiftAnchor(1); render(); };
+  $('#todayP').onclick = () => { ui.anchor = latestEntryDate(c); render(); };
+  $('#csvBtn').onclick = () => {
+    const rows = sheetTable(c, buckets, t).rows;
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    download(`${c.name} ${p.label}.csv`, csv, 'text/csv');
+    toast('CSV exported');
+  };
+}
+function sheetTable(c, buckets, t){
+  const cols = buckets.map(b=>b.label);
+  const rows = [['', ...cols, 'Total']];
+  let html = `<table class="sheet"><thead><tr><th scope="col">Metric</th>${cols.map(l=>`<th scope="col">${esc(l)}</th>`).join('')}<th scope="col" class="tot">Total</th></tr></thead><tbody>`;
+  const line = (label, key, fmt, opts={}) => {
+    const vals = buckets.map(b => b.days ? b[key] : null);
+    rows.push([label, ...vals.map(v => v===null ? '' : fmt(v)), fmt(t[key])]);
+    const cell = v => v===null ? '<td></td>' : `<td class="${opts.v?varCls(v):''}">${fmt(v)}</td>`;
+    html += `<tr class="${opts.indent?'indent':''}"><td>${esc(label)}</td>${vals.map(cell).join('')}<td class="tot ${opts.v?varCls(t[key]):''}">${fmt(t[key])}</td></tr>`;
+  };
+  const group = label => { rows.push([label]); html += `<tr class="grp"><td>${esc(label)}</td>${buckets.map(()=>'<td></td>').join('')}<td></td></tr>`; };
+  group('Patients');
+  line('Patients seen','pts',f0,{indent:1}); line('New patients','nps',f0,{indent:1});
+  group('Clinicians');
+  line('Clinician hours','clin',f1,{indent:1}); line('Allowed hours','allowClin',f1,{indent:1});
+  line('Hours over (+) / under (−)','overClin',signed,{indent:1,v:1});
+  line('Payroll hours (PTO incl.)','payClin',f1,{indent:1});
+  group('Aides');
+  line('Aide hours','aide',f1,{indent:1}); line('Allowed hours','allowAide',f1,{indent:1});
+  line('Hours over (+) / under (−)','overAide',signed,{indent:1,v:1});
+  line('Payroll hours (PTO incl.)','payAide',f1,{indent:1});
+  for (const role of ['clinician','aide']){
+    const people = c.staff.filter(s => s.role===role && t.byStaff[s.id]);
+    if (!people.length) continue;
+    group(role==='clinician' ? 'Hours by clinician' : 'Hours by aide');
+    people.forEach(s => {
+      const vals = buckets.map(b => b.byStaff[s.id] ? b.byStaff[s.id].h + b.byStaff[s.id].p : null);
+      const tot = t.byStaff[s.id].h + t.byStaff[s.id].p;
+      const ptoNote = t.byStaff[s.id].p ? ` (${f1(t.byStaff[s.id].p)} PTO)` : '';
+      rows.push([s.name + ptoNote, ...vals.map(v=>v===null?'':f1(v)), f1(tot)]);
+      html += `<tr class="indent"><td>${esc(s.name)}<span class="muted">${esc(ptoNote)}</span></td>${vals.map(v=>`<td>${v===null?'':f1(v)}</td>`).join('')}<td class="tot">${f1(tot)}</td></tr>`;
+    });
+  }
+  html += '</tbody></table>';
+  return {html, rows};
+}
+function chartBase(){
+  const ink2 = css('--ink-2'), line = css('--line');
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.color = ink2;
+  return {ink2, line,
+    opts: (extra={}) => ({
+      responsive:true, maintainAspectRatio:false, animation:{duration:400},
+      plugins:{legend:{display:false}, tooltip:{backgroundColor:css('--ink'), titleColor:css('--surface'), bodyColor:css('--surface'), padding:10, cornerRadius:8}},
+      scales:{ x:{grid:{display:false}, ticks:{color:ink2}}, y:{grid:{color:line}, border:{display:false}, ticks:{color:ink2}} },
+      ...extra
+    })};
+}
+function drawCharts(c, buckets, t){
+  if (!window.Chart) return;
+  const {ink2, line, opts} = chartBase();
+  const teal = css('--teal'), plum = css('--plum'), gold = css('--gold'), ink = css('--ink');
+  const labels = buckets.map(b=>b.label);
+  const varChart = (id, key) => {
+    const vals = buckets.map(b => b.days ? Math.round(b[key]*10)/10 : null);
+    const o = opts();
+    o.scales.y.grid.color = ctx => ctx.tick.value === 0 ? ink2 : line;
+    o.scales.y.grid.lineWidth = ctx => ctx.tick.value === 0 ? 1.5 : 1;
+    o.plugins.tooltip.callbacks = {label: ctx => ctx.raw > 0 ? `${f1(ctx.raw)} hrs over` : ctx.raw < 0 ? `${f1(-ctx.raw)} hrs under` : 'On budget'};
+    charts.push(new Chart($(id), {type:'bar', data:{labels, datasets:[{data:vals, backgroundColor:vals.map(v=>v>0?plum:teal), borderRadius:5, maxBarThickness:42}]}, options:o}));
+  };
+  varChart('#cVarC','overClin'); varChart('#cVarA','overAide');
+
+  const r1 = v => Math.round(v*10)/10;
+  const oh = opts(); oh.plugins.legend = {display:true, position:'bottom', labels:{boxWidth:12, boxHeight:12, color:ink2}};
+  charts.push(new Chart($('#cHours'), {type:'bar', data:{labels, datasets:[
+    {label:'Clinician worked', data:buckets.map(b=>r1(b.clin)), backgroundColor:teal, borderRadius:4, maxBarThickness:28},
+    {label:'Clinician allowed', data:buckets.map(b=>r1(b.allowClin)), backgroundColor:rgba(teal,.28), borderRadius:4, maxBarThickness:28},
+    {label:'Aide worked', data:buckets.map(b=>r1(b.aide)), backgroundColor:gold, borderRadius:4, maxBarThickness:28},
+    {label:'Aide allowed', data:buckets.map(b=>r1(b.allowAide)), backgroundColor:rgba(gold,.3), borderRadius:4, maxBarThickness:28},
+  ]}, options:oh}));
+
+  const op = opts(); op.plugins.legend = {display:true, position:'bottom', labels:{boxWidth:12, boxHeight:12, color:ink2}};
+  op.scales.y1 = {position:'right', grid:{display:false}, border:{display:false}, ticks:{color:ink2, precision:0}, beginAtZero:true};
+  charts.push(new Chart($('#cPts'), {data:{labels, datasets:[
+    {type:'bar', label:'Patients seen', data:buckets.map(b=>b.pts), backgroundColor:rgba(css('--cyan'),.7), borderRadius:5, maxBarThickness:36, yAxisID:'y'},
+    {type:'line', label:'New patients', data:buckets.map(b=>b.nps), borderColor:gold, backgroundColor:gold, pointRadius:4, tension:.3, yAxisID:'y1'},
+  ]}, options:op}));
+
+  const people = c.staff.filter(s=>t.byStaff[s.id]).sort((a,b)=>(t.byStaff[b.id].h+t.byStaff[b.id].p)-(t.byStaff[a.id].h+t.byStaff[a.id].p));
+  const os = opts({indexAxis:'y'});
+  os.scales = {x:{grid:{color:line}, border:{display:false}, ticks:{color:ink2}}, y:{grid:{display:false}, ticks:{color:ink2}}};
+  os.plugins.tooltip.callbacks = {label: ctx => { const s = people[ctx.dataIndex]; const v = t.byStaff[s.id]; return `${f1(v.h)} hrs worked${v.p?`, ${f1(v.p)} PTO`:''} (${s.role})`; }};
+  charts.push(new Chart($('#cStaff'), {type:'bar', data:{labels:people.map(s=>s.name), datasets:[
+    {data:people.map(s=>r1(t.byStaff[s.id].h+t.byStaff[s.id].p)), backgroundColor:people.map(s=>s.role==='clinician'?teal:gold), borderRadius:5, maxBarThickness:20}
+  ]}, options:os}));
+}
+
+/* ---------- daily log ---------- */
+function renderLog(){
+  const c = clinic(); const d = parse(ui.logDate); const e = c.entries[ui.logDate] || {};
+  const ws = startOfWeek(d);
+  const strip = [...Array(7)].map((_,i) => {
+    const x = addDays(ws,i), k = dkey(x), r = dayCalc(c,k);
+    return `<button data-day="${k}" class="${r?'has':''}" ${k===ui.logDate?'aria-current="date"':''}><div class="dn">${DOW[x.getDay()]}</div><div class="dd">${x.getDate()}</div><div class="dp">${r?`${f0(r.pts)} pts`:''}</div></button>`;
+  }).join('');
+  const staffBlock = role => {
+    const ppl = c.staff.filter(s => s.role===role && (s.active || (e.staff||{})[s.id]));
+    const ov = role==='clinician' ? e.clinOverride : e.aideOverride;
+    const rows = ppl.map(s => {
+      const v = (e.staff||{})[s.id] || {};
+      return `<div class="nm ${s.active?'':'arch'}">${esc(s.name)}${s.active?'':' (archived)'}</div>
+        <input type="number" min="0" step="0.25" inputmode="decimal" data-sid="${s.id}" data-f="h" value="${v.h||''}" aria-label="${esc(s.name)} hours worked">
+        <input type="number" min="0" step="0.25" inputmode="decimal" data-sid="${s.id}" data-f="pto" value="${v.pto||''}" aria-label="${esc(s.name)} PTO hours">`;
+    }).join('');
+    return `<section class="panel">
+      <div class="hd"><h2>${role==='clinician'?'Clinicians':'Aides'}</h2></div>
+      ${ppl.length ? `<div class="staffrows"><div class="h">Name</div><div class="h">Worked</div><div class="h">PTO</div>${rows}
+        <div class="totrow">Total worked</div><div class="totval" id="tot-${role}"></div><div></div></div>` : `<p class="muted">No ${role==='clinician'?'clinicians':'aides'} yet. <a href="#" data-go="staff">Add staff</a></p>`}
+      <div class="field" style="margin-top:12px" id="ovwrap-${role}">
+        <label for="ov-${role}">Day total, if you're not entering hours by person</label>
+        <input type="number" min="0" step="0.25" inputmode="decimal" id="ov-${role}" value="${ov ?? ''}" style="font-size:15px;font-weight:600">
+      </div>
+    </section>`;
+  };
+  $('#main').innerHTML = `
+    <div class="top">
+      <div><h1>Daily log</h1><p class="sub">${d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</p></div>
+      <div class="ctrl">
+        <button class="btn icon" id="prevD" aria-label="Previous day">‹</button>
+        <input type="date" id="dateIn" value="${ui.logDate}" style="width:auto" aria-label="Date">
+        <button class="btn icon" id="nextD" aria-label="Next day">›</button>
+        <button class="btn" id="todayD">Today</button>
+        <button class="btn" id="impD">Import schedule</button>
+      </div>
+    </div>
+    <div class="weekstrip" role="group" aria-label="Days this week">${strip}</div>
+    <div class="logcols">
+      <div class="stack">
+        <section class="panel"><div class="hd"><h2>Patients</h2></div>
+          <div class="fields2">
+            <div class="field"><label for="ptsIn">Patients seen</label><input type="number" min="0" step="1" inputmode="numeric" id="ptsIn" value="${e.pts ?? ''}"></div>
+            <div class="field"><label for="npsIn">New patients</label><input type="number" min="0" step="1" inputmode="numeric" id="npsIn" value="${e.nps ?? ''}"></div>
+          </div>
+        </section>
+        ${staffBlock('clinician')}
+        ${staffBlock('aide')}
+        <section class="panel"><div class="field"><label for="notesIn">Notes</label><textarea id="notesIn" placeholder="Closures, call-outs, anything that explains the numbers">${esc(e.notes||'')}</textarea></div></section>
+      </div>
+      <aside class="panel summary" aria-live="polite">
+        <h2>Day summary</h2>
+        <div id="sumBody"></div>
+        <div class="divider"></div>
+        <div class="saved" id="savedNote"></div>
+        <div class="ctrl" style="margin-top:10px">
+          <button class="btn danger" id="clearDay">Clear day</button>
+          <button class="btn" id="viewWeek">See this week</button>
+        </div>
+      </aside>
+    </div>`;
+
+  const readForm = () => {
+    const entry = {pts:$('#ptsIn').value, nps:$('#npsIn').value, notes:$('#notesIn').value, staff:{}};
+    document.querySelectorAll('[data-sid]').forEach(inp => {
+      if (inp.value==='') return;
+      entry.staff[inp.dataset.sid] = entry.staff[inp.dataset.sid] || {};
+      entry.staff[inp.dataset.sid][inp.dataset.f] = num(inp.value);
+    });
+    const oc = $('#ov-clinician')?.value, oa = $('#ov-aide')?.value;
+    if (oc) entry.clinOverride = num(oc);
+    if (oa) entry.aideOverride = num(oa);
+    entry.pts = entry.pts==='' ? '' : num(entry.pts); entry.nps = entry.nps==='' ? '' : num(entry.nps);
+    const empty = entry.pts==='' && entry.nps==='' && !entry.notes.trim() && !Object.keys(entry.staff).length && !oc && !oa;
+    return empty ? null : entry;
+  };
+  const refresh = () => {
+    const r = dayCalc(c, ui.logDate) || {pts:0,nps:0,clin:0,aide:0,allowClin:0,allowAide:0,overClin:0,overAide:0,ptoClin:0,ptoAide:0};
+    const ent = c.entries[ui.logDate] || {staff:{}};
+    for (const role of ['clinician','aide']){
+      const sum = Object.entries(ent.staff||{}).reduce((a,[id,v]) => { const s = c.staff.find(x=>x.id===id); return s && s.role===role ? a + num(v.h) : a; }, 0);
+      const tot = $(`#tot-${role}`); if (tot) tot.textContent = f1(sum);
+      const wrap = $(`#ovwrap-${role}`); if (wrap) wrap.style.display = sum > 0 ? 'none' : '';
+    }
+    const meter = (label, worked, allowed, over, color) => {
+      const max = Math.max(worked, allowed, 1) * 1.1;
+      return `<div class="meter"><div class="row"><span>${label}</span><span><b>${f1(worked)}</b> <span class="muted">/ ${f1(allowed)} allowed</span></span></div>
+        <div class="bar"><div class="fill" style="width:${worked/max*100}%;background:${over>0.05?'var(--plum)':color}"></div><div class="allow" style="left:${allowed/max*100}%" title="Allowed"></div></div>
+        ${varPill(over)}</div>`;
+    };
+    $('#sumBody').innerHTML = `
+      <p class="muted" style="margin:6px 0 4px">${f0(r.pts)} patients, ${f0(r.nps)} new</p>
+      ${meter('Clinician hours', r.clin, r.allowClin, r.overClin, 'var(--teal)')}
+      ${meter('Aide hours', r.aide, r.allowAide, r.overAide, 'var(--gold)')}
+      ${(r.ptoClin||r.ptoAide) ? `<p class="hint">PTO logged: ${f1(r.ptoClin+r.ptoAide)} hrs (counts toward payroll, not budget)</p>` : ''}`;
+    const sd = c.entries[ui.logDate];
+    $('#savedNote').textContent = sd ? 'Saved automatically' : 'Start typing to log this day';
+  };
+  $('#main').querySelectorAll('input:not(#dateIn), textarea').forEach(inp => inp.addEventListener('input', () => {
+    const entry = readForm();
+    if (entry) c.entries[ui.logDate] = entry; else delete c.entries[ui.logDate];
+    persist(); refresh();
+    const btn = document.querySelector(`[data-day="${ui.logDate}"]`);
+    if (btn){ const rr = dayCalc(c, ui.logDate); btn.classList.toggle('has', !!rr); btn.querySelector('.dp').textContent = rr ? `${f0(rr.pts)} pts` : ''; }
+  }));
+  refresh();
+  const setDate = k => { ui.logDate = k; render(); };
+  $('#prevD').onclick = () => setDate(dkey(addDays(d,-1)));
+  $('#nextD').onclick = () => setDate(dkey(addDays(d,1)));
+  $('#todayD').onclick = () => setDate(dkey(new Date()));
+  $('#impD').onclick = () => go('import');
+  $('#dateIn').onchange = ev => ev.target.value && setDate(ev.target.value);
+  document.querySelectorAll('[data-day]').forEach(b => b.onclick = () => setDate(b.dataset.day));
+  document.querySelectorAll('[data-go]').forEach(a => a.onclick = ev => { ev.preventDefault(); go(a.dataset.go); });
+  $('#clearDay').onclick = () => { if (!c.entries[ui.logDate]) return; if (confirm('Clear everything logged for this day?')){ delete c.entries[ui.logDate]; persist(); render(); toast('Day cleared'); } };
+  $('#viewWeek').onclick = () => { ui.ptype = 'week'; ui.anchor = d; go('dash'); };
+}
+
+/* ---------- staff ---------- */
+function staffHasHours(c, id){ return Object.values(c.entries).some(e => e.staff && e.staff[id]); }
+function renderStaff(){
+  const c = clinic();
+  const col = role => {
+    const ppl = c.staff.filter(s=>s.role===role);
+    return `<section class="panel"><div class="hd"><h2>${role==='clinician'?'Clinicians':'Aides'}</h2><p>${ppl.filter(s=>s.active).length} active</p></div>
+      <div class="list">${ppl.length ? ppl.map(s => `
+        <div class="it">
+          <input type="text" value="${esc(s.name)}" data-rename="${s.id}" aria-label="Name">
+          <label class="toggle"><input type="checkbox" data-active="${s.id}" ${s.active?'checked':''}> Active</label>
+          <button class="btn danger" data-del="${s.id}">${staffHasHours(c,s.id)?'Archive':'Remove'}</button>
+        </div>`).join('') : `<p class="muted">No one here yet.</p>`}</div></section>`;
+  };
+  $('#main').innerHTML = `
+    <div class="top"><div><h1>Staff</h1><p class="sub">Active staff appear in the daily log. Archived staff keep their past hours.</p></div></div>
+    <section class="panel" style="margin-bottom:18px"><h2>Add staff</h2>
+      <div class="addrow" style="margin-top:10px">
+        <input type="text" id="newName" placeholder="Name" aria-label="New staff name">
+        <select id="newRole" aria-label="Role"><option value="clinician">Clinician</option><option value="aide">Aide</option></select>
+        <button class="btn primary" id="addStaff">Add staff</button>
+      </div></section>
+    <div class="grid">${col('clinician')}${col('aide')}</div>`;
+  const add = () => {
+    const n = $('#newName').value.trim(); if (!n){ $('#newName').focus(); return; }
+    c.staff.push({id:uid(), name:n, role:$('#newRole').value, active:true}); persist(); render(); toast(`${n} added`);
+  };
+  $('#addStaff').onclick = add;
+  $('#newName').onkeydown = ev => { if (ev.key==='Enter') add(); };
+  document.querySelectorAll('[data-rename]').forEach(i => i.onchange = () => { const s = c.staff.find(x=>x.id===i.dataset.rename); if (i.value.trim()){ s.name = i.value.trim(); persist(); toast('Name updated'); } });
+  document.querySelectorAll('[data-active]').forEach(i => i.onchange = () => { c.staff.find(x=>x.id===i.dataset.active).active = i.checked; persist(); });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    const s = c.staff.find(x=>x.id===b.dataset.del);
+    if (staffHasHours(c,s.id)){ s.active = false; persist(); render(); toast(`${s.name} archived`); }
+    else if (confirm(`Remove ${s.name}?`)){ c.staff = c.staff.filter(x=>x.id!==s.id); persist(); render(); toast(`${s.name} removed`); }
+  });
+}
+
+/* ---------- settings ---------- */
+function renderSettings(){
+  const c = clinic();
+  const cen = Object.keys(c.census).sort().reverse();
+  $('#main').innerHTML = `
+    <div class="top"><div><h1>Settings</h1><p class="sub">Settings apply to ${esc(c.name)}.</p></div></div>
+    <div class="grid">
+      <section class="panel"><h2>Clinic</h2>
+        <div class="form" style="margin-top:12px">
+          <div class="field"><label for="cName">Clinic name</label><input type="text" id="cName" value="${esc(c.name)}" style="font-size:15px;font-weight:600"></div>
+        </div></section>
+      <section class="panel"><h2>Budget targets</h2>
+        <div class="form" style="margin-top:12px">
+          <div class="field"><label for="rateC">Patients per clinician hour</label><input type="number" step="0.05" min="0.1" id="rateC" value="${c.settings.ptsPerClinHr}" style="font-size:15px;font-weight:600"></div>
+          <div class="field"><label for="rateA">Aide hours per patient</label><input type="number" step="0.01" min="0" id="rateA" value="${c.settings.aideHrsPerPt}" style="font-size:15px;font-weight:600"></div>
+          <p class="hint" style="margin:0">Taken from your spreadsheet: 39 patients allows 21.7 clinician hours (39 ÷ 1.8) and 11.7 aide hours (39 × 0.3).</p>
+        </div></section>
+      <section class="panel"><div class="hd"><h2>Census by month</h2><p>Shown on the dashboard</p></div>
+        <div class="list census">${cen.map(k => `<div class="it"><div>${MONTHS[+k.slice(5)-1]} ${k.slice(0,4)}</div><input type="number" min="0" value="${c.census[k]}" data-cen="${k}" aria-label="Census"><button class="btn danger" data-cdel="${k}">Remove</button></div>`).join('') || '<p class="muted">No census entered yet.</p>'}</div>
+        <div class="addrow" style="margin-top:12px;grid-template-columns:1fr 120px auto">
+          <input type="month" id="cenMonth" aria-label="Month"><input type="number" min="0" id="cenVal" placeholder="Census" aria-label="Census value"><button class="btn" id="cenAdd">Add month</button>
+        </div></section>
+      <section class="panel"><h2>Clinics</h2>
+        <p class="hint">Each clinic has its own staff, log, and targets. Switch clinics from the menu.</p>
+        <div class="addrow" style="margin-top:12px;grid-template-columns:1fr auto"><input type="text" id="newClinic" placeholder="New clinic name" aria-label="New clinic name"><button class="btn primary" id="addClinic">Add clinic</button></div>
+        <div class="ctrl" style="margin-top:12px"><button class="btn" id="copyStaff">Copy staff list to new clinic</button></div>
+        <div class="divider"></div>
+        <button class="btn danger" id="delClinic" ${state.clinics.length<2?'disabled':''}>Delete ${esc(c.name)}</button>
+      </section>
+      <section class="panel wide"><h2>Backup</h2>
+        <p class="hint">Download a backup file of every clinic, or restore one you saved earlier.</p>
+        <div class="ctrl" style="margin-top:12px">
+          <button class="btn" id="expJson">Download backup</button>
+          <label class="btn" for="impJson" style="display:inline-block">Restore backup</label>
+          <input type="file" id="impJson" accept="application/json" hidden>
+          <button class="btn danger" id="resetAll">Reset to sample data</button>
+        </div></section>
+    </div>`;
+  let copyStaff = false;
+  $('#cName').onchange = ev => { if (ev.target.value.trim()){ c.name = ev.target.value.trim(); persist(); renderShell(); toast('Clinic renamed'); } };
+  $('#rateC').onchange = ev => { const v = num(ev.target.value); if (v>0){ c.settings.ptsPerClinHr = v; persist(); renderShell(); toast('Target saved'); } };
+  $('#rateA').onchange = ev => { const v = num(ev.target.value); if (v>=0){ c.settings.aideHrsPerPt = v; persist(); renderShell(); toast('Target saved'); } };
+  document.querySelectorAll('[data-cen]').forEach(i => i.onchange = () => { c.census[i.dataset.cen] = num(i.value); persist(); toast('Census saved'); });
+  document.querySelectorAll('[data-cdel]').forEach(b => b.onclick = () => { delete c.census[b.dataset.cdel]; persist(); render(); });
+  $('#cenAdd').onclick = () => { const m = $('#cenMonth').value, v = $('#cenVal').value; if (!m || v===''){ toast('Pick a month and enter a census'); return; } c.census[m] = num(v); persist(); render(); toast('Census saved'); };
+  $('#copyStaff').onclick = ev => { copyStaff = !copyStaff; ev.target.textContent = copyStaff ? 'Staff list will be copied' : 'Copy staff list to new clinic'; ev.target.classList.toggle('primary', copyStaff); };
+  $('#addClinic').onclick = () => {
+    const n = $('#newClinic').value.trim(); if (!n){ $('#newClinic').focus(); return; }
+    const nc = blankClinic(n);
+    nc.settings = {...c.settings};
+    if (copyStaff) nc.staff = c.staff.filter(s=>s.active).map(s=>({...s, id:uid()}));
+    state.clinics.push(nc); state.activeId = nc.id; persist(); render(); toast(`${n} added`);
+  };
+  $('#delClinic').onclick = () => {
+    if (state.clinics.length<2) return;
+    if (confirm(`Delete ${c.name} and everything logged for it? This can't be undone.`)){
+      state.clinics = state.clinics.filter(x=>x.id!==c.id); state.activeId = state.clinics[0].id; persist(); render(); toast('Clinic deleted');
+    }
+  };
+  $('#expJson').onclick = () => { download(`clinic-tracker-backup-${dkey(new Date())}.json`, JSON.stringify(state,null,2), 'application/json'); toast('Backup downloaded'); };
+  $('#impJson').onchange = ev => {
+    const file = ev.target.files[0]; if (!file) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try { const s = JSON.parse(rd.result); if (!Array.isArray(s.clinics) || !s.clinics.length) throw 0; state = s; if (!clinic()) state.activeId = s.clinics[0].id; persist(); render(); toast('Backup restored'); }
+      catch { toast('That file isn\'t a clinic tracker backup'); }
+    };
+    rd.readAsText(file);
+  };
+  $('#resetAll').onclick = () => {
+    if (confirm('Replace all clinics with the sample data from your spreadsheet? Download a backup first if you want to keep your entries.')){
+      const sc = seedClinic(); state = {clinics:[sc], activeId:sc.id}; ui.anchor = latestEntryDate(sc); persist(); render(); toast('Sample data loaded');
+    }
+  };
+}
+function download(name, text, type){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* ---------- schedule import: read a day's schedule screenshot or PDF ---------- */
+const SCHED_FILLS = {
+  yellow:[255,255,181], lavender:[200,197,252], cyan:[198,247,246], mauve:[213,181,213],
+  gray:[200,200,200], lightgreen:[205,245,186], white:[255,255,255]
+};
+const FILL_LABEL = {yellow:'Yellow', lavender:'Lavender', cyan:'Aqua', mauve:'Mauve', gray:'Gray', lightgreen:'Light green', white:'White', other:'Other'};
+const STATUS_LABEL = {signed:'Signed note', checkedin:'Checked in', none:'Not checked in', cancelled:'Cancelled'};
+const STATUS_COLOR = {signed:'#1FCB78', checkedin:'#FFB020', none:'#8FA3C0', cancelled:'#FF4D7A'};
+let imp = null;
+
+function analyzeSchedule(cv){
+  const W = cv.width, H = cv.height;
+  const D = cv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;
+  const px = (x,y) => { const i = (y*W+x)*4; return [D[i],D[i+1],D[i+2]]; };
+  const chr = p => Math.max(p[0],p[1],p[2]) - Math.min(p[0],p[1],p[2]);
+  const lm = p => (p[0]*3 + p[1]*6 + p[2]) / 10;
+  const near = (p,q,t) => Math.abs(p[0]-q[0])<t && Math.abs(p[1]-q[1])<t && Math.abs(p[2]-q[2])<t;
+
+  // 1. the "not worked" green: most common strongly green color
+  const hist = new Map();
+  for (let y=0;y<H;y+=3) for (let x=0;x<W;x+=3){ const p = px(x,y);
+    if (p[1]>p[0]+40 && p[1]>p[2]+20){ const k = (p[0]>>3)<<10 | (p[1]>>3)<<5 | (p[2]>>3); hist.set(k,(hist.get(k)||0)+1); } }
+  let gk=-1, gc=0; for (const [k,v] of hist) if (v>gc){ gc=v; gk=k; }
+  const GREEN = gc>150 ? [((gk>>10)&31)*8+4, ((gk>>5)&31)*8+4, (gk&31)*8+4] : [139,206,165];
+  const isGreen = p => near(p,GREEN,16);
+
+  // 2. horizontal grid lines -> 15-minute slots
+  const lineLike = p => chr(p)<30 && lm(p)>140 && lm(p)<236;
+  const xa = Math.floor(W*.03), xb = Math.floor(W*.97);
+  const f = new Float32Array(H);
+  const dif = (p,q) => Math.abs(p[0]-q[0])+Math.abs(p[1]-q[1])+Math.abs(p[2]-q[2]);
+  // a grid line differs from the rows just above and below it (works for blurry or compressed images)
+  for (let y=2;y<H-2;y++){ let n=0,t=0; for (let x=xa;x<xb;x+=2){ t++; const p=px(x,y), u=px(x,y-2), d=px(x,y+2);
+    if (dif(p,u)>24 && dif(p,d)>24 && dif(u,d)<60) n++; } f[y]=n/t; }
+  let peaks = [];
+  for (let y=3;y<H-3;y++) if (f[y]>0.12 && f[y]>=f[y-1] && f[y]>=f[y+1] && f[y]>f[y-3]+0.06 && f[y]>f[y+3]+0.06){
+    if (peaks.length && y-peaks[peaks.length-1]<=3){ if (f[y]>f[peaks[peaks.length-1]]) peaks[peaks.length-1]=y; } else peaks.push(y);
+  }
+  const diffs = []; for (let i=1;i<peaks.length;i++){ const d = peaks[i]-peaks[i-1]; if (d>=8) diffs.push(d); }
+  if (diffs.length < 4) throw new Error('grid');
+  const dh = {}; diffs.forEach(d => dh[d]=(dh[d]||0)+1);
+  const mode = +Object.entries(dh).sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0];
+  const close = diffs.filter(d=>Math.abs(d-mode)<=2); const S0 = close.reduce((a,b)=>a+b,0)/close.length;
+  let best = null, cur = [peaks[0]];
+  const flush = () => { if (!best || cur[cur.length-1]-cur[0] > best[best.length-1]-best[0]) best = cur.slice(); };
+  for (let i=1;i<peaks.length;i++){
+    const r = (peaks[i]-cur[cur.length-1])/S0, k = Math.round(r);
+    if (k>=1 && k<=8 && Math.abs(r-k)<0.18) cur.push(peaks[i]);
+    else if (k===0) continue;
+    else { flush(); cur=[peaks[i]]; }
+  }
+  flush();
+  let gridTop = best[0], gridBot = best[best.length-1];
+  // the last row's bottom border is often a darker table edge; extend while another row fits below
+  for (let guard=0; guard<3; guard++){
+    const ny = Math.round(gridBot + S0); let hit = false;
+    for (let y=ny-3;y<=ny+3 && y<H;y++){ let n=0,t=0; if (y<2 || y>H-3) continue; for (let x=xa;x<xb;x+=2){ t++; const p=px(x,y), u=px(x,y-2), d=px(x,y+2);
+      const df = (q) => Math.abs(p[0]-q[0])+Math.abs(p[1]-q[1])+Math.abs(p[2]-q[2]); if (df(u)>40 && df(d)>40) n++; } if (n/t>0.35) hit = true; }
+    if (!hit && ny < H){ // no border drawn: extend if the green pattern carries on below
+      const gfr = y => { let g=0,t=0; for (let x=xa;x<xb;x+=3){ t++; if (isGreen(px(x,Math.min(H-1,Math.round(y))))) g++; } return g/t; };
+      const above = gfr(gridBot - S0/2), below = gfr(gridBot + S0/2);
+      if (above > 0.05 && below > above*0.85 && Math.abs(gfr(gridBot+S0*0.85)-below) < 0.05) hit = true;
+    }
+    if (!hit) break; gridBot = ny;
+  }
+  const nSlots = Math.round((gridBot-gridTop)/S0);
+  if (nSlots < 4) throw new Error('grid');
+  const S = (gridBot-gridTop)/nSlots;
+  const headerTop = peaks.filter(p => p < gridTop - S*0.5).pop() ?? Math.max(0, Math.round(gridTop - S*1.4));
+
+  // 3. vertical lines -> provider columns
+  const sepLike = p => chr(p)<35 && lm(p)<236;
+  const vf = [];
+  for (let x=0;x<W;x++){ let n=0,t=0; if (x<2||x>W-3){ vf.push(0); continue; }
+    for (let y=Math.round(gridTop);y<gridBot;y+=3){ t++; const p=px(x,y); if (chr(p)<50 && lm(p)<238 && dif(p,px(x-2,y))>20 && dif(p,px(x+2,y))>20) n++; } vf.push(n/t); }
+  const seps = [];
+  for (let x=0;x<W;x++) if (vf[x]>0.7){ if (seps.length && x-seps[seps.length-1].b<=2) seps[seps.length-1].b=x; else seps.push({a:x,b:x}); }
+  let cols = [];
+  for (let i=1;i<seps.length;i++){
+    const x0 = seps[i-1].b+1, x1 = seps[i].a-1;
+    if (x1-x0 < 2.5*S) continue;
+    let gut=0,t=0; for (let y=Math.round(gridTop);y<gridBot;y+=5) for (let x=x0;x<x1;x+=5){ t++; const p=px(x,y); if (chr(p)<12 && lm(p)>226 && lm(p)<250) gut++; }
+    if (gut/t > 0.5) continue;
+    cols.push({x0,x1});
+  }
+  if (!cols.length) throw new Error('columns');
+
+  // 4. status icons mark each appointment's top-left corner
+  const rx0 = cols[0].x0, rx1 = cols[cols.length-1].x1, ry0 = Math.round(gridTop), ry1 = Math.round(gridBot);
+  const RW = rx1-rx0+1, RH = ry1-ry0+1;
+  const fills = [...Object.values(SCHED_FILLS), [228,222,187]];
+  const M = new Uint8Array(RW*RH);
+  for (let y=0;y<RH;y++) for (let x=0;x<RW;x++){
+    const p = px(x+rx0,y+ry0);
+    if (chr(p)>60 && !(p[2]>p[0]+30 && p[2]>p[1]+30) && !isGreen(p) && !fills.some(q=>near(p,q,12))) M[y*RW+x]=1;
+  }
+  const seen = new Uint8Array(RW*RH), cands = [];
+  for (let i=0;i<M.length;i++){
+    if (!M[i] || seen[i]) continue;
+    const st=[i]; seen[i]=1; const pix=[]; let mnx=1e9,mxx=-1,mny=1e9,mxy=-1;
+    while (st.length){ const j=st.pop(); const x=j%RW, y=(j/RW)|0; pix.push(j);
+      if (x<mnx) mnx=x; if (x>mxx) mxx=x; if (y<mny) mny=y; if (y>mxy) mxy=y;
+      for (const k of [j-1,j+1,j-RW,j+RW]) if (k>=0 && k<M.length && M[k] && !seen[k] && Math.abs((k%RW)-x)<=1){ seen[k]=1; st.push(k); } }
+    const w = mxx-mnx+1, h = mxy-mny+1;
+    if (h<0.42*S || h>0.95*S || w<0.42*S || w>4*S) continue;
+    const gx0 = mnx+rx0, gy0 = mny+ry0, gy1 = mxy+ry0, side = Math.min(w,h);
+    let sr=0,sg=0,sb=0,n=0;
+    for (const j of pix){ if (j%RW - mnx < side){ const p = px(j%RW+rx0, ((j/RW)|0)+ry0); sr+=p[0]; sg+=p[1]; sb+=p[2]; n++; } }
+    sr/=n; sg/=n; sb/=n;
+    const hue = sr>sg+40 ? 'red' : (sb<sg-40 && sr>sg-25 ? 'yellow' : 'green');
+    const cx = gx0 + (side>>1), cy = gy0 + (h>>1), rr = Math.max(2, Math.round(h*.2));
+    let light=0,tt=0; for (let y=cy-rr;y<=cy+rr;y++) for (let x=cx-rr;x<=cx+rr;x++){ const p=px(x,y); tt++; if (chr(p)<60 && lm(p)>190) light++; }
+    if (hue==='green' && light/tt > 0.08) continue;           // payment coin, not a status icon
+    const lp = k => { const p = px(Math.max(0,gx0-k), cy); return chr(p)<45 && lm(p)>140 && lm(p)<238; };
+    if (!(lp(1)||lp(2)||lp(3))) continue;                     // flags and coins sit beside the status icon
+    if (cands.some(c => Math.abs(c.y0-gy0)<0.3*S && Math.abs(c.x0-gx0)<0.5*S)) continue;
+    cands.push({x0:gx0, y0:gy0, y1:gy1, h, hue});
+  }
+
+  // 5. each appointment's length and color
+  const appts = [];
+  for (const c of cands){
+    const col = cols.findIndex(k => c.x0>=k.x0-2 && c.x0<=k.x1); if (col<0) continue;
+    const fx = c.x0 + Math.max(2, Math.round(c.h*.2)), fy = Math.min(H-1, c.y1+3);
+    const fill = px(fx,fy);
+    let yb = fy; while (yb < gridBot+2 && yb < H-1 && near(px(fx,yb+1),fill,22)) yb++;
+    const slot = Math.max(0, Math.floor((c.y0-gridTop)/S + 0.02));
+    const slots = Math.max(1, Math.round((yb+1 - (gridTop+slot*S))/S));
+    let fk='other', fd=1e9;
+    for (const [k,q] of Object.entries(SCHED_FILLS)){ const d = Math.abs(fill[0]-q[0])+Math.abs(fill[1]-q[1])+Math.abs(fill[2]-q[2]); if (d<fd && d<40){ fd=d; fk=k; } }
+    let xr = fx; while (xr < cols[col].x1 && !lineLike(px(xr+1, Math.round(fy+(yb-fy)/2))) && !near(px(xr+1,fy),[228,222,187],12)) xr++;
+    appts.push({col, x:c.x0, y:Math.round(gridTop+slot*S), w:Math.max(xr-c.x0+4, c.h*2), h:slots*S, slot, slots, fill:fk,
+      status: c.hue==='red' ? 'cancelled' : c.hue==='yellow' ? 'checkedin' : 'signed',
+      isEval: fk==='yellow' && slots>=3});
+  }
+  // 5b. colored blocks without a status icon = not checked in
+  {
+    const named = Object.entries(SCHED_FILLS).filter(([k])=>k!=='white');
+    const which = p => { for (const [k,q] of named) if (near(p,q,k==='gray'?7:14)) return k; return null; };
+    const K = new Int8Array(RW*RH).fill(-1), keys = named.map(n=>n[0]);
+    for (let y=0;y<RH;y++) for (let x=0;x<RW;x++){ const k = which(px(x+rx0,y+ry0)); if (k) K[y*RW+x] = keys.indexOf(k); }
+    const vis = new Uint8Array(RW*RH);
+    for (let i=0;i<K.length;i++){
+      if (K[i]<0 || vis[i]) continue;
+      const kk = K[i], st=[i]; vis[i]=1; let mnx=1e9,mxx=-1,mny=1e9,mxy=-1,cnt=0;
+      while (st.length){ const j=st.pop(), x=j%RW, y=(j/RW)|0; cnt++;
+        if (x<mnx) mnx=x; if (x>mxx) mxx=x; if (y<mny) mny=y; if (y>mxy) mxy=y;
+        for (const k of [j-1,j+1,j-RW,j+RW]) if (k>=0 && k<K.length && K[k]===kk && !vis[k] && Math.abs((k%RW)-x)<=1){ vis[k]=1; st.push(k); } }
+      const w = mxx-mnx+1, h = mxy-mny+1;
+      if (h < 0.8*S || w < 0.8*S || cnt < 0.5*w*h) continue;
+      const bx = mnx+rx0, by = mny+ry0;
+      const fr = ((by-gridTop)/S) % 1; if (fr > 0.22 && fr < 0.9) continue;   // must start at a row line, like a real block
+      const col = cols.findIndex(k => bx>=k.x0-2 && bx<=k.x1); if (col<0) continue;
+      const slot = Math.max(0, Math.round((by-gridTop)/S - 0.15)), slots = Math.max(1, Math.round((mxy+ry0+1-(gridTop+slot*S))/S));
+      const covered = appts.some(a => a.col===col && a.x > bx-0.8*S && a.x < bx+w && slot < a.slot+a.slots && a.slot < slot+slots);
+      if (covered) continue;
+      appts.push({col, x:bx, y:Math.round(gridTop+slot*S), w, h:slots*S, slot, slots, fill:keys[kk], status:'none', isEval: keys[kk]==='yellow' && slots>=3});
+    }
+  }
+  appts.sort((a,b)=>a.col-b.col || a.slot-b.slot || a.x-b.x);
+
+  // 6. worked time per column: anything that isn't green
+  cols = cols.map((k,ci) => {
+    const worked = [];
+    for (let s=0;s<nSlots;s++){
+      let g=0,t=0;
+      for (const fr of [.3,.5,.7]){ const y = Math.round(gridTop+(s+fr)*S); for (let x=k.x0+2;x<k.x1-1;x+=2){ t++; if (isGreen(px(x,y))) g++; } }
+      const booked = appts.some(a => a.col===ci && s>=a.slot && s<a.slot+a.slots);
+      worked.push(g/t < 0.5 || booked);
+    }
+    return {...k, worked};
+  });
+  return {W,H,S,gridTop,gridBot,nSlots,headerTop,cols,appts};
+}
+
+/* loaders for optional helpers (need internet the first time) */
+const scriptCache = {};
+function loadScript(src){
+  return scriptCache[src] || (scriptCache[src] = new Promise((res,rej) => {
+    const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => { delete scriptCache[src]; rej(new Error('load')); };
+    document.head.appendChild(s);
+  }));
+}
+async function pdfToCanvas(file){
+  const base = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  await loadScript(base+'pdf.min.js');
+  try { const wt = await (await fetch(base+'pdf.worker.min.js')).text(); pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([wt],{type:'text/javascript'})); }
+  catch { pdfjsLib.GlobalWorkerOptions.workerSrc = base+'pdf.worker.min.js'; }
+  const pdf = await pdfjsLib.getDocument({data: await file.arrayBuffer()}).promise;
+  const page = await pdf.getPage(1);
+  const vp0 = page.getViewport({scale:1}); const vp = page.getViewport({scale: 1400/vp0.width});
+  const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  const ctx = cv.getContext('2d',{willReadFrequently:true}); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height);
+  await page.render({canvasContext:ctx, viewport:vp}).promise;
+  const tc = await page.getTextContent();
+  const words = tc.items.filter(it=>it.str.trim()).map(it => { const [x,y] = vp.convertToViewportPoint(it.transform[4], it.transform[5]); return {str:it.str, x, y}; });
+  return {cv, words};
+}
+async function imageToCanvas(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res,rej) => { const i = new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+    const cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+    const ctx = cv.getContext('2d',{willReadFrequently:true}); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); ctx.drawImage(img,0,0);
+    return {cv, words:null};
+  } finally { URL.revokeObjectURL(url); }
+}
+async function ocrHeaders(cv, r){
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js');
+  const worker = await Tesseract.createWorker('eng');
+  const crop = (x,y,w,h) => { const c = document.createElement('canvas'); c.width=w*3; c.height=h*3; const g=c.getContext('2d'); g.imageSmoothingEnabled=true; g.drawImage(cv,x,y,w,h,0,0,w*3,h*3); return c; };
+  const heads = [];
+  for (const k of r.cols){ const {data} = await worker.recognize(crop(k.x0, r.headerTop+1, k.x1-k.x0, Math.max(8, r.gridTop-r.headerTop-2))); heads.push(data.text.replace(/\s+/g,' ').trim()); }
+  const {data:t} = await worker.recognize(crop(0, 0, cv.width, Math.max(10, r.headerTop)));
+  await worker.terminate();
+  return {heads, title:t.text};
+}
+function parseDateText(s){
+  const m = String(s||'').match(/(\d{1,2})[-\/._](\d{1,2})(?:[-\/._](\d{2,4}))?/); if (!m) return null;
+  const mo = +m[1], d = +m[2]; let y = m[3] ? +m[3] : new Date().getFullYear(); if (y<100) y += 2000;
+  if (mo<1||mo>12||d<1||d>31) return null;
+  return `${y}-${pad(mo)}-${pad(d)}`;
+}
+function matchStaff(c, text){
+  if (!text) return null;
+  const words = text.toLowerCase().replace(/[^a-z\s'-]/g,' ').split(/\s+/).filter(w=>w.length>1);
+  const cl = c.staff.filter(s=>s.role==='clinician');
+  for (const s of cl){ const n = s.name.toLowerCase(); if (text.toLowerCase().includes(n)) return s.id; }
+  for (const s of cl){ const first = s.name.toLowerCase().split(/\s+/)[0]; if (words[0] && first.length>=3 && (words[0].startsWith(first) || first.startsWith(words[0]))) return s.id; }
+  return null;
+}
+
+async function handleScheduleFile(file){
+  const c = clinic();
+  const out = $('#impOut'); if (out) out.innerHTML = `<section class="panel"><p class="muted" style="margin:0">Reading ${esc(file.name||'screenshot')}…</p></section>`;
+  try {
+    const isPdf = file.type==='application/pdf' || /\.pdf$/i.test(file.name||'');
+    let loaded;
+    try { loaded = isPdf ? await pdfToCanvas(file) : await imageToCanvas(file); }
+    catch(e){ throw new Error(isPdf ? 'pdf' : 'image'); }
+    const r = analyzeSchedule(loaded.cv);
+    const heads = r.cols.map(k => loaded.words ? loaded.words.filter(w => w.x>=k.x0-2 && w.x<k.x1 && w.y>r.headerTop-2 && w.y<=r.gridTop+2).map(w=>w.str).join(' ').replace(/\s+/g,' ').trim() : '');
+    const saved = c.settings.schedMap || [];
+    imp = {
+      name:file.name||'Pasted screenshot', cv:loaded.cv, r, heads,
+      map: r.cols.map((k,i) => matchStaff(c, heads[i]) || saved[i] || ''),
+      hours: r.cols.map(k => k.worked.filter(Boolean).length/4),
+      date: parseDateText(loaded.words ? [...loaded.words].filter(w=>w.y<r.headerTop+2).sort((a,b)=>a.y-b.y).map(w=>w.str).join(' ').match(/\d{1,2}-\d{1,2}-\d{2,4}/)?.[0] : null) || parseDateText(file.name) || ui.logDate,
+      ocr: loaded.words ? 'done' : 'pending'
+    };
+    renderImportResult();
+    if (!loaded.words){
+      ocrHeaders(loaded.cv, r).then(({heads, title}) => {
+        if (!imp || imp.cv !== loaded.cv) return;
+        imp.heads = heads; imp.ocr = 'done';
+        imp.map = imp.map.map((m,i) => imp.userMapped?.[i] ? m : (matchStaff(c, heads[i]) || m));
+        const td = parseDateText(title); if (td && !imp.userDate && !parseDateText(file.name)) imp.date = td;
+        renderImportResult();
+      }).catch(() => { if (imp) { imp.ocr = 'off'; renderImportResult(); } });
+    }
+  } catch(e){
+    const msg = e.message==='pdf' ? 'This PDF could not be opened. Connect to the internet once so the PDF reader can load, then try again.'
+      : e.message==='image' ? 'This file could not be opened as an image. Use a PNG, JPG, or PDF.'
+      : "The schedule grid wasn't found. Capture the full day view, including the time column and provider names, then try again.";
+    if ($('#impOut')) $('#impOut').innerHTML = `<section class="panel"><h2>Couldn't read the schedule</h2><p class="muted" style="margin:6px 0 0">${msg}</p></section>`;
+  }
+}
+
+function fmtSlot(slot){
+  const start = num(clinic().settings.schedStart ?? 360);
+  const m = start + slot*15, h = Math.floor(m/60)%24, mm = m%60;
+  return `${((h+11)%12)+1}:${pad(mm)} ${h<12?'AM':'PM'}`;
+}
+function importTotals(){
+  const per = imp.r.cols.map(() => ({signed:0,checkedin:0,none:0,cancelled:0,evals:0}));
+  imp.r.appts.forEach(a => { per[a.col][a.status]++; if (a.isEval && (a.status==='signed' || a.status==='checkedin')) per[a.col].evals++; });
+  per.forEach(p => p.counted = p.signed + p.checkedin);
+  const tot = per.reduce((t,p)=>{ for (const k in p) t[k]=(t[k]||0)+p[k]; return t; }, {});
+  return {per, tot};
+}
+
+function renderImport(){
+  ui.impTab = ui.impTab || 'schedule';
+  const tabs = [['schedule','Provider schedule'],['hours','Staff hours (text)']];
+  $('#main').innerHTML = `
+    <div class="top"><div><h1>Import</h1><p class="sub">${ui.impTab==='schedule' ? "Read a day's provider schedule to fill in hours worked, visits, and evals." : 'Paste or load a week of staff times or hours to fill in the daily log.'}</p></div>
+      <div class="seg" role="group" aria-label="What to import">${tabs.map(([v,l])=>`<button data-itab="${v}" aria-pressed="${ui.impTab===v}">${l}</button>`).join('')}</div></div>
+    <div id="impBox"></div>`;
+  document.querySelectorAll('[data-itab]').forEach(b => b.onclick = () => { ui.impTab = b.dataset.itab; render(); });
+  const box = $('#impBox');
+  if (ui.impTab==='hours'){ renderHoursImport(box); return; }
+  box.innerHTML = `
+    <section class="panel drop" id="drop" tabindex="0" aria-label="Schedule file drop area">
+      <p style="margin:0 0 12px">Drop a screenshot or PDF of the day here, or paste a screenshot with Ctrl+V.</p>
+      <label class="btn primary" for="schedFile">Choose file</label>
+      <input type="file" id="schedFile" accept="image/*,application/pdf" hidden>
+      <p class="hint">Green time counts as not worked. Yellow 60-minute blocks count as evals. Seen = signed notes plus checked in.</p>
+    </section>
+    <div id="impOut"></div>`;
+  const drop = $('#drop');
+  $('#schedFile').onchange = ev => ev.target.files[0] && handleScheduleFile(ev.target.files[0]);
+  drop.ondragover = ev => { ev.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = ev => { ev.preventDefault(); drop.classList.remove('over'); const f = ev.dataTransfer.files[0]; if (f) handleScheduleFile(f); };
+  if (imp) renderImportResult();
+}
+document.addEventListener('paste', ev => {
+  if (ui.view!=='import' || ui.impTab==='hours') return;
+  const it = [...(ev.clipboardData?.items||[])].find(i => i.type.startsWith('image/'));
+  if (it){ ev.preventDefault(); handleScheduleFile(it.getAsFile()); }
+});
+
+function renderImportResult(){
+  const out = $('#impOut'); if (!out || !imp) return;
+  const c = clinic(), r = imp.r, {per, tot} = importTotals();
+  const clin = c.staff.filter(s=>s.role==='clinician' && s.active);
+  const startOpts = []; for (let m=300;m<=600;m+=15) startOpts.push(m);
+  const start = num(c.settings.schedStart ?? 360);
+  const hoursTot = imp.hours.reduce((a,b)=>a+num(b),0);
+  out.innerHTML = `
+    <section class="panel" style="margin-top:18px">
+      <div class="hd"><h2>${esc(imp.name)}</h2><p>${r.cols.length} providers and ${r.appts.length} appointments found</p></div>
+      <div class="fields3">
+        <div class="field"><label for="impDate">Date</label><input type="date" id="impDate" value="${imp.date}"></div>
+        <div class="field"><label for="impStart">First row of the schedule</label><select id="impStart">${startOpts.map(m=>`<option value="${m}" ${m===start?'selected':''}>${fmtMin(m)}</option>`).join('')}</select></div>
+        <div class="field"><label>Counted as seen</label><p class="hint" style="margin:6px 0 0">Signed notes (green icon) plus checked in (yellow icon). Cancelled (red X) and blocks with no icon aren't counted.</p></div>
+      </div>
+    </section>
+    <section class="panel" style="margin-top:18px">
+      <div class="hd"><h2>By provider</h2><p>${imp.ocr==='pending' ? 'Reading provider names…' : 'Check the staff match for each column'}</p></div>
+      <div class="tablewrap"><table class="sheet imp">
+        <thead><tr><th scope="col">Schedule column</th><th scope="col">Staff member</th><th scope="col">Hours worked</th><th scope="col">Signed note</th><th scope="col">Checked in</th><th scope="col">Seen</th><th scope="col">Not checked in</th><th scope="col">Cancelled</th><th scope="col">Evals</th></tr></thead>
+        <tbody>${r.cols.map((k,i)=>`<tr>
+          <td>${esc(imp.heads[i] || `Column ${i+1}`)}</td>
+          <td><select data-map="${i}" aria-label="Staff member for column ${i+1}"><option value="">Don't add hours</option>${clin.map(s=>`<option value="${s.id}" ${imp.map[i]===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}<option value="__new">Add new clinician…</option></select></td>
+          <td><input type="number" min="0" step="0.25" data-hrs="${i}" value="${imp.hours[i]}" aria-label="Hours worked, column ${i+1}" style="width:90px"></td>
+          <td>${per[i].signed}</td><td>${per[i].checkedin}</td><td><b>${per[i].counted}</b></td><td>${per[i].none}</td><td>${per[i].cancelled}</td><td>${per[i].evals}</td></tr>`).join('')}
+          <tr><td class="tot">Total</td><td class="tot"></td><td class="tot">${f1(hoursTot)}</td><td class="tot">${tot.signed}</td><td class="tot">${tot.checkedin}</td><td class="tot">${tot.counted}</td><td class="tot">${tot.none}</td><td class="tot">${tot.cancelled}</td><td class="tot">${tot.evals}</td></tr>
+        </tbody></table></div>
+      <div class="applybar">
+        <p style="margin:0"><b>${tot.counted}</b> patients seen, <b>${tot.evals}</b> evals (new patients), <b>${f1(hoursTot)}</b> clinician hours</p>
+        <button class="btn primary" id="impApply">Add to daily log</button>
+      </div>
+    </section>
+    <section class="panel" style="margin-top:18px">
+      <div class="hd"><h2>What was read</h2><p>Click an appointment to change its status</p></div>
+      <div class="legend">${Object.entries(STATUS_LABEL).map(([k,l])=>`<span><i style="border-color:${STATUS_COLOR[k]}"></i>${l}</span>`).join('')}<span><i style="border-color:#00E5FF;border-width:3px"></i>Eval</span><span><i class="nw"></i>Not worked</span></div>
+      <div class="overlaywrap"><canvas id="impCanvas" aria-label="Schedule with detected appointments outlined"></canvas></div>
+      <details style="margin-top:14px"><summary>Review every appointment (${r.appts.length})</summary>
+        <div class="tablewrap" style="margin-top:10px"><table class="sheet imp"><thead><tr><th scope="col">Provider</th><th scope="col">Time</th><th scope="col">Length</th><th scope="col">Block color</th><th scope="col">Status</th><th scope="col">Eval</th></tr></thead>
+        <tbody>${r.appts.map((a,j)=>`<tr><td>${esc(imp.heads[a.col]?.split(' ').slice(0,2).join(' ') || `Column ${a.col+1}`)}</td><td>${fmtSlot(a.slot)}</td><td>${a.slots*15} min</td><td>${FILL_LABEL[a.fill]}</td>
+          <td><select data-ast="${j}" aria-label="Status">${Object.entries(STATUS_LABEL).map(([k,l])=>`<option value="${k}" ${a.status===k?'selected':''}>${l}</option>`).join('')}</select></td>
+          <td><input type="checkbox" data-aev="${j}" ${a.isEval?'checked':''} aria-label="Eval"></td></tr>`).join('')}</tbody></table></div>
+      </details>
+    </section>`;
+  drawImportOverlay();
+  $('#impDate').onchange = ev => { imp.date = ev.target.value; imp.userDate = true; };
+  $('#impStart').onchange = ev => { c.settings.schedStart = +ev.target.value; persist(); renderImportResult(); };
+  document.querySelectorAll('[data-map]').forEach(s => s.onchange = () => {
+    const i = +s.dataset.map;
+    if (s.value==='__new'){
+      const guess = (imp.heads[i]||'').split(' ')[0] || '';
+      const n = prompt('Name of the new clinician', guess);
+      if (n && n.trim()){ const ns = {id:uid(), name:n.trim(), role:'clinician', active:true}; c.staff.push(ns); imp.map[i] = ns.id; persist(); toast(`${ns.name} added`); }
+    } else imp.map[i] = s.value;
+    imp.userMapped = imp.userMapped || {}; imp.userMapped[i] = true;
+    renderImportResult();
+  });
+  document.querySelectorAll('[data-hrs]').forEach(inp => inp.onchange = () => { imp.hours[+inp.dataset.hrs] = num(inp.value); renderImportResult(); });
+  document.querySelectorAll('[data-ast]').forEach(s => s.onchange = () => { imp.r.appts[+s.dataset.ast].status = s.value; renderImportResult(); });
+  document.querySelectorAll('[data-aev]').forEach(b => b.onchange = () => { imp.r.appts[+b.dataset.aev].isEval = b.checked; renderImportResult(); });
+  $('#impCanvas').onclick = ev => {
+    const cv = ev.currentTarget, rect = cv.getBoundingClientRect(), sc = imp.r.W / rect.width;
+    const x = (ev.clientX-rect.left)*sc, y = (ev.clientY-rect.top)*sc;
+    const a = imp.r.appts.find(a => x>=a.x-2 && x<=a.x+a.w && y>=a.y && y<=a.y+a.h);
+    if (!a) return;
+    const order = ['signed','checkedin','none','cancelled']; a.status = order[(order.indexOf(a.status)+1)%4];
+    renderImportResult();
+  };
+  $('#impApply').onclick = applyImport;
+}
+const fmtMin = m => `${((Math.floor(m/60)+11)%12)+1}:${pad(m%60)} ${m<720?'AM':'PM'}`;
+
+function drawImportOverlay(){
+  const cv = $('#impCanvas'), r = imp.r; cv.width = r.W; cv.height = r.H;
+  const g = cv.getContext('2d'); g.drawImage(imp.cv,0,0);
+  const lw = Math.max(2, Math.round(r.W/600));
+  r.cols.forEach(k => k.worked.forEach((w,s) => { if (!w){ g.fillStyle='rgba(3,18,43,.38)'; g.fillRect(k.x0, r.gridTop+s*r.S, k.x1-k.x0, r.S); } }));
+  r.appts.forEach(a => {
+    const col = STATUS_COLOR[a.status];
+    if (a.isEval){ g.strokeStyle='#00E5FF'; g.lineWidth=lw*2.5; g.strokeRect(a.x-lw*2, a.y-lw, a.w+lw*3, a.h+lw*1.5); }
+    g.strokeStyle=col; g.lineWidth=lw; g.strokeRect(a.x-lw, a.y+lw/2, a.w+lw, a.h-lw);
+  });
+}
+
+function applyImport(){
+  const c = clinic(), {tot} = importTotals();
+  const date = $('#impDate').value || imp.date;
+  const e = c.entries[date] ? {...c.entries[date], staff:{...(c.entries[date].staff||{})}} : {pts:'',nps:'',notes:'',staff:{}};
+  const missing = [];
+  imp.r.cols.forEach((k,i) => {
+    const sid = imp.map[i];
+    if (!sid){ if (num(imp.hours[i])>0) missing.push(imp.heads[i] || `Column ${i+1}`); return; }
+    e.staff[sid] = {...(e.staff[sid]||{}), h:num(imp.hours[i])};
+  });
+  if (missing.length && !confirm(`No staff member is picked for ${missing.join(', ')}, so those hours won't be added. Continue?`)) return;
+  if (c.entries[date] && (c.entries[date].pts!=='' && c.entries[date].pts!=null) && !confirm(`${date} already has entries. Replace patients, evals, and these clinicians' hours?`)) return;
+  e.pts = tot.counted; e.nps = tot.evals; delete e.clinOverride;
+  c.entries[date] = e;
+  c.settings.schedMap = imp.map.slice();
+  persist();
+  ui.logDate = date; imp = null;
+  toast('Added to daily log');
+  go('log');
+}
+
+/* ---------- staff hours import: raw text or file of times / hours for the week ---------- */
+const DAYMAP = {sun:6,sunday:6,mon:0,monday:0,tue:1,tues:1,tuesday:1,wed:2,weds:2,wednesday:2,thu:3,thur:3,thurs:3,thursday:3,fri:4,friday:4,sat:5,saturday:5};
+const NOT_NAMES = new Set(['am','pm','a','p','to','off','total','totals','week','weekly','hours','hour','hrs','hr','h','name','names','schedule','schedules','aide','aides','shift','shifts','day','days','date','dates','of','and','the','for','in','out','pto','break','lunch','staff','time','times','jan','feb','mar','apr','may','jun','jul','aug','sep','sept','oct','nov','dec','january','february','march','april','june','july','august','september','october','november','december']);
+let hrsImp = null;
+
+function rangeHours(m){
+  let a = +m[1] + (m[2]? +m[2]/60 : 0), b = +m[4] + (m[5]? +m[5]/60 : 0);
+  const ap1 = m[3] && m[3][0].toLowerCase(), ap2 = m[6] && m[6][0].toLowerCase();
+  const to24 = (h,ap) => ap==='p' ? (h%12)+12 : h%12;
+  if (ap1) a = to24(a,ap1);
+  if (ap2) b = to24(b,ap2);
+  if (!ap1 && !ap2){ if (a < 6) a += 12; if (b <= a) b += 12; }
+  else if (!ap1){ if (a < 12 && a+12 < b) a += 12; }
+  else if (!ap2){ if (b <= a) b += 12; }
+  if (b <= a) b += 24;
+  return b - a;
+}
+const RANGE_RX = /(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m?\.?)?\s*(?:-|–|—|to)\s*(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m?\.?)?/i;
+const TOKEN_RX = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{1,2}-\d{1,2}-\d{2,4})|(\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m?\.?)?\s*(?:-|–|—|to)\s*\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m?\.?)?)|(\d+(?:\.\d+)?)(?:\s*(?:hours|hrs|hr|h)\b)?(?![\d/.:])|([A-Za-z][A-Za-z'’.-]*)/gi;
+
+function tokDate(s, weekStart){
+  const m = s.match(/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/); if (!m) return null;
+  const mo = +m[1], d = +m[2]; if (mo<1||mo>12||d<1||d>31) return null;
+  let y = m[3] ? +m[3] : weekStart.getFullYear(); if (y<100) y += 2000;
+  return dkey(new Date(y, mo-1, d));
+}
+function staffByName(c, word){
+  const w = word.toLowerCase().replace(/[’']s$/,'');
+  return c.staff.find(s => s.name.toLowerCase() === w) || c.staff.find(s => s.name.toLowerCase().split(/\s+/)[0] === w) || null;
+}
+
+function parseHoursText(c, text, weekStart, breakOn){
+  const recs = [], unread = [], names = new Set(), firstDates = [];
+  const add = (name, dayRef, hours, pto, src) => recs.push({name, dayRef, hours:Math.round(hours*100)/100, pto, src});
+  const valueOf = (cell) => {
+    cell = cell.trim(); if (!cell) return null;
+    const pto = /\bpto\b/i.test(cell);
+    const rm = cell.match(RANGE_RX);
+    if (rm && +rm[4] <= 24){ let h = rangeHours(rm); if (breakOn && h >= 6) h -= 0.5; return {hours:pto?0:h, pto:pto?h:0, src:rm[0]}; }
+    const nm = cell.match(/(\d+(?:\.\d+)?)/);
+    if (nm && +nm[1] <= 16) return {hours:pto?0:+nm[1], pto:pto?+nm[1]:0, src:cell};
+    if (pto) return {hours:0, pto:8, src:'PTO'};
+    return null;
+  };
+  const lines = text.replace(/\r/g,'').split('\n');
+  // Grid layout: a header row of days or dates, one row per person (tabs, commas, or | between cells)
+  let grid = null;
+  lines.forEach((raw, li) => {
+    const line = raw.trim(); if (!line) return;
+    const delim = raw.includes('\t') ? '\t' : raw.includes('|') ? '|' : raw.includes(',') ? ',' : null;
+    if (delim){
+      const cells = raw.split(delim);
+      const map = cells.map(cl => { const t = cl.trim(); const k = t.toLowerCase().replace(/[.:,]/g,''); if (k in DAYMAP) return {off:DAYMAP[k]}; const d = tokDate(t.split(/\s+/)[0], weekStart); return d ? {date:d} : null; });
+      if (map.filter(Boolean).length >= 3){ grid = {delim, map}; map.forEach(m => m && m.date && firstDates.push(m.date)); return; }
+      if (grid && grid.delim === delim){
+        const nameCell = cells[0].trim().replace(/\s+/g,' ');
+        if (!nameCell || /^\d/.test(nameCell) || /^(total|aide hours|clinician hours|dates?|allowed|hrs over|pts|nps|census|patients|new patients)\b/i.test(nameCell)) { unread.push(line); return; }
+        names.add(nameCell); let any = false;
+        grid.map.forEach((m,i) => { if (!m || i===0) return; const v = valueOf(cells[i]||''); if (v){ add(nameCell, m.date ? {date:m.date} : {off:m.off}, v.hours, v.pto, v.src); any = true; } });
+        if (!any) unread.push(line);
+        return;
+      }
+    }
+    // Free text: names, days or dates, and times or hours in any order
+    grid = null;
+    const s = raw.replace(/([A-Za-z])(\d)/g,'$1 $2');
+    let name = null, day = null, lastRec = null, pendingPto = false, made = 0, prevWasName = false;
+    if (hrsImp && hrsImp.carryName && !/[A-Za-z]{3,}/.test(s.replace(/\b(mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)\w*\b/gi,'').replace(/\b[ap]\.?m\.?\b/gi,''))) name = hrsImp.carryName;
+    let m; TOKEN_RX.lastIndex = 0;
+    while ((m = TOKEN_RX.exec(s))){
+      if (m[1]){ const d = tokDate(m[1], weekStart); if (d){ day = {date:d}; firstDates.push(d); } prevWasName = false; continue; }
+      if (m[2]){
+        const rm = m[2].match(RANGE_RX);
+        if (+rm[4] > 24 || +rm[1] > 24){ const d = tokDate(`${rm[1]}-${rm[4]}`, weekStart); if (d){ day = {date:d}; firstDates.push(d); } continue; }
+        if (!name) { prevWasName = false; continue; }
+        let h = rangeHours(rm); if (breakOn && h >= 6) h -= 0.5;
+        add(name, day, pendingPto?0:h, pendingPto?h:0, rm[0].trim()); lastRec = recs[recs.length-1]; made++; pendingPto = false; prevWasName = false; continue;
+      }
+      if (m[3]){
+        const v = +m[3]; prevWasName = false;
+        if (!name || v > 16) continue;
+        add(name, day, pendingPto?0:v, pendingPto?v:0, m[3]+' hrs'); lastRec = recs[recs.length-1]; made++; pendingPto = false; continue;
+      }
+      const w = m[4], wl = w.toLowerCase().replace(/[.:,]/g,'');
+      if (wl in DAYMAP){ day = {off:DAYMAP[wl]}; prevWasName = false; continue; }
+      if (wl === 'pto'){ if (lastRec && lastRec.pto===0 && lastRec.hours>0 && made){ lastRec.pto = lastRec.hours; lastRec.hours = 0; } else pendingPto = true; continue; }
+      if (wl === 'off'){ prevWasName = false; continue; }
+      if (NOT_NAMES.has(wl) || w.length < 2) { prevWasName = false; continue; }
+      if (prevWasName && !staffByName(c, w)) continue;            // a last name after a first name
+      if (name && pendingPto){ add(name, day, 0, 8, 'PTO'); made++; pendingPto = false; }
+      name = staffByName(c, w)?.name || (w[0].toUpperCase() + w.slice(1));
+      names.add(name); prevWasName = true;
+      if (hrsImp) hrsImp.carryName = name;
+    }
+    if (name && pendingPto){ add(name, day, 0, 8, 'PTO'); made++; }
+    if (!made && !(name && s.trim().split(/\s+/).length <= 3)) unread.push(line);
+  });
+  return {recs, unread, names:[...names], firstDates};
+}
+
+function recDate(r, weekStart){
+  if (!r.dayRef) return '';
+  return r.dayRef.date || dkey(addDays(weekStart, r.dayRef.off));
+}
+
+function renderHoursImport(box){
+  const c = clinic();
+  if (!hrsImp) hrsImp = {text:'', week:dkey(startOfWeek(parse(ui.logDate))), breakOn:false, parsed:null, map:{}, carryName:null};
+  const ws = parse(hrsImp.week);
+  box.innerHTML = `
+    <section class="panel">
+      <div class="hd"><h2>Staff hours for a week</h2><p>Paste a list or choose a text or CSV file</p></div>
+      <div class="fields3">
+        <div class="field"><label for="hwWeek">Week of</label><input type="date" id="hwWeek" value="${hrsImp.week}"></div>
+        <div class="field"><label>Text file</label><label class="btn" for="hwFile" style="display:inline-block">Choose file</label><input type="file" id="hwFile" accept=".txt,.csv,.tsv,text/plain,text/csv" hidden></div>
+        <div class="field"><label class="toggle" style="margin-top:26px"><input type="checkbox" id="hwBreak" ${hrsImp.breakOn?'checked':''}> Subtract a 30-minute break from shifts of 6+ hours</label></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label for="hwText">Times or hours</label>
+        <textarea id="hwText" rows="9" spellcheck="false" style="font-size:15px;line-height:1.5" placeholder="Any of these work:
+Makaiya  Mon 8-4:30, Wed 8-4:30
+Malik Tue 10am-4pm
+Sabrina 10/27 12 to 8
+Emma Thu 6 hrs
+Morgan Fri PTO
+
+Or a grid copied from a spreadsheet, with days or dates across the top.">${esc(hrsImp.text)}</textarea></div>
+      <div class="ctrl" style="margin-top:12px"><button class="btn primary" id="hwRead">Read hours</button><span class="hint" style="margin:0">Times without AM or PM are read as a normal workday, so 10-4 means 10 AM to 4 PM.</span></div>
+    </section>
+    <div id="hwOut"></div>`;
+  $('#hwWeek').onchange = ev => { if (ev.target.value){ hrsImp.week = dkey(startOfWeek(parse(ev.target.value))); hrsImp.userWeek = true; renderHoursImport(box); } };
+  $('#hwBreak').onchange = ev => { hrsImp.breakOn = ev.target.checked; if (hrsImp.parsed) readHours(box); };
+  $('#hwText').oninput = ev => { hrsImp.text = ev.target.value; };
+  $('#hwRead').onclick = () => { hrsImp.text = $('#hwText').value; readHours(box); };
+  $('#hwFile').onchange = ev => { const f = ev.target.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => { hrsImp.text = String(rd.result); readHours(box); }; rd.readAsText(f); };
+  if (hrsImp.parsed) renderHoursResult();
+}
+
+function readHours(box){
+  const c = clinic();
+  hrsImp.carryName = null;
+  let p = parseHoursText(c, hrsImp.text, parse(hrsImp.week), hrsImp.breakOn);
+  if (!hrsImp.userWeek && p.firstDates.length){
+    const wk = dkey(startOfWeek(parse(p.firstDates[0])));
+    if (wk !== hrsImp.week){ hrsImp.week = wk; hrsImp.carryName = null; p = parseHoursText(c, hrsImp.text, parse(wk), hrsImp.breakOn); }
+  }
+  hrsImp.parsed = p;
+  p.names.forEach(n => { if (!(n in hrsImp.map)) hrsImp.map[n] = staffByName(c, n)?.id || '__new'; });
+  renderHoursImport(box);
+}
+
+function hoursGrid(){
+  const ws = parse(hrsImp.week), days = [...Array(7)].map((_,i)=>dkey(addDays(ws,i)));
+  const byPerson = {};
+  hrsImp.parsed.recs.forEach(r => {
+    const sid = hrsImp.map[r.name]; if (!sid || sid==='__skip') return;
+    const d = recDate(r, ws); if (!d) return;
+    const key = sid==='__new' ? 'new:'+r.name : sid;
+    byPerson[key] = byPerson[key] || {name: sid==='__new' ? r.name : (clinic().staff.find(s=>s.id===sid)?.name || r.name), isNew: sid==='__new', raw:r.name, days:{}};
+    const cell = byPerson[key].days[d] = byPerson[key].days[d] || {h:0,p:0};
+    cell.h += r.hours; cell.p += r.pto;
+  });
+  return {days, byPerson};
+}
+
+function renderHoursResult(){
+  const out = $('#hwOut'); if (!out) return;
+  const c = clinic(), p = hrsImp.parsed, ws = parse(hrsImp.week);
+  const days = [...Array(7)].map((_,i)=>addDays(ws,i));
+  const inWeek = d => d && days.some(x=>dkey(x)===d);
+  const staffOpts = sel => `${c.staff.map(s=>`<option value="${s.id}" ${sel===s.id?'selected':''}>${esc(s.name)} (${s.role})</option>`).join('')}`;
+  const {byPerson} = hoursGrid();
+  const people = Object.values(byPerson);
+  const noDay = p.recs.filter(r => !recDate(r, ws)).length;
+  const outside = p.recs.filter(r => { const d = recDate(r, ws); return d && !inWeek(d); }).length;
+  out.innerHTML = !p.recs.length ? `<section class="panel" style="margin-top:18px"><h2>No hours found</h2><p class="muted" style="margin:6px 0 0">Each line needs a name and a time like 8-4:30 or a number of hours. ${p.unread.length?'These lines weren\'t understood:':''}</p>${p.unread.length?`<ul class="hint">${p.unread.slice(0,8).map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}</section>` : `
+    <section class="panel" style="margin-top:18px">
+      <div class="hd"><h2>Names found</h2><p>Match each name to a staff member</p></div>
+      <div class="list">${p.names.map(n => `<div class="it" style="grid-template-columns:1fr 260px">
+        <div><b>${esc(n)}</b></div>
+        <select data-hn="${esc(n)}" aria-label="Staff member for ${esc(n)}">${staffOpts(hrsImp.map[n])}<option value="__new" ${hrsImp.map[n]==='__new'?'selected':''}>Add as new aide</option><option value="__skip" ${hrsImp.map[n]==='__skip'?'selected':''}>Skip this name</option></select></div>`).join('')}</div>
+    </section>
+    <section class="panel" style="margin-top:18px">
+      <div class="hd"><h2>Week of ${MONTHS[ws.getMonth()]} ${ws.getDate()}</h2><p>Hours worked, with PTO in parentheses</p></div>
+      <div class="tablewrap"><table class="sheet">
+        <thead><tr><th scope="col">Name</th>${days.map(d=>`<th scope="col">${DOW[d.getDay()]} ${md(d)}</th>`).join('')}<th scope="col" class="tot">Total</th></tr></thead>
+        <tbody>${people.map(pp => { let t=0,tp=0; const cells = days.map(d => { const v = pp.days[dkey(d)]; if (!v) return '<td></td>'; t+=v.h; tp+=v.p; return `<td>${v.h?f1(v.h):''}${v.p?` <span class="muted">(${f1(v.p)})</span>`:''}</td>`; }).join('');
+          return `<tr><td>${esc(pp.name)}${pp.isNew?' <span class="muted">(new)</span>':''}</td>${cells}<td class="tot">${f1(t)}${tp?` <span class="muted">(${f1(tp)})</span>`:''}</td></tr>`; }).join('') || `<tr><td colspan="9" class="muted">Nothing to add yet. Match the names above.</td></tr>`}</tbody></table></div>
+      ${noDay ? `<p class="hint">${noDay} ${noDay===1?'entry has':'entries have'} no day. Pick one in the list below.</p>` : ''}
+      ${outside ? `<p class="hint">${outside} ${outside===1?'entry falls':'entries fall'} outside this week and will still be added on ${outside===1?'its':'their'} own date.</p>` : ''}
+      <div class="applybar"><p style="margin:0">Replaces these people's hours on these days. Patients and other staff stay as they are.</p><button class="btn primary" id="hwApply" ${people.length?'':'disabled'}>Add to daily log</button></div>
+    </section>
+    <section class="panel" style="margin-top:18px">
+      <details ${noDay?'open':''}><summary>Every entry read (${p.recs.length})</summary>
+        <div class="tablewrap" style="margin-top:10px"><table class="sheet imp"><thead><tr><th scope="col">Name</th><th scope="col">Read as</th><th scope="col">Day</th><th scope="col">Hours</th><th scope="col">PTO</th><th scope="col"><span class="sr">Remove</span></th></tr></thead>
+        <tbody>${p.recs.map((r,j) => { const d = recDate(r, ws); return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.src)}</td>
+          <td><select data-hd="${j}" aria-label="Day"><option value="">Pick a day</option>${days.map(x=>`<option value="${dkey(x)}" ${d===dkey(x)?'selected':''}>${DOW[x.getDay()]} ${md(x)}</option>`).join('')}${d && !inWeek(d) ? `<option value="${d}" selected>${d}</option>` : ''}</select></td>
+          <td><input type="number" min="0" step="0.25" data-hh="${j}" value="${r.hours||''}" style="width:80px" aria-label="Hours"></td>
+          <td><input type="number" min="0" step="0.25" data-hp="${j}" value="${r.pto||''}" style="width:80px" aria-label="PTO"></td>
+          <td><button class="btn danger icon" data-hx="${j}" aria-label="Remove entry">×</button></td></tr>`; }).join('')}</tbody></table></div>
+      </details>
+      ${p.unread.length ? `<details style="margin-top:12px"><summary>Lines not understood (${p.unread.length})</summary><ul class="hint">${p.unread.map(l=>`<li>${esc(l)}</li>`).join('')}</ul></details>` : ''}
+    </section>`;
+  if (!p.recs.length) return;
+  document.querySelectorAll('[data-hn]').forEach(s => s.onchange = () => { hrsImp.map[s.dataset.hn] = s.value; renderHoursResult(); });
+  document.querySelectorAll('[data-hd]').forEach(s => s.onchange = () => { p.recs[+s.dataset.hd].dayRef = s.value ? {date:s.value} : null; renderHoursResult(); });
+  document.querySelectorAll('[data-hh]').forEach(i => i.onchange = () => { p.recs[+i.dataset.hh].hours = num(i.value); renderHoursResult(); });
+  document.querySelectorAll('[data-hp]').forEach(i => i.onchange = () => { p.recs[+i.dataset.hp].pto = num(i.value); renderHoursResult(); });
+  document.querySelectorAll('[data-hx]').forEach(b => b.onclick = () => { p.recs.splice(+b.dataset.hx,1); renderHoursResult(); });
+  $('#hwApply').onclick = applyHours;
+}
+
+function applyHours(){
+  const c = clinic();
+  // create new aides first
+  Object.entries(hrsImp.map).forEach(([n,v]) => { if (v==='__new'){ const s = {id:uid(), name:n, role:'aide', active:true}; c.staff.push(s); hrsImp.map[n] = s.id; } });
+  const {byPerson} = hoursGrid(); let days = new Set(), count = 0;
+  Object.entries(byPerson).forEach(([sid, pp]) => {
+    Object.entries(pp.days).forEach(([d, v]) => {
+      const e = c.entries[d] || (c.entries[d] = {pts:'', nps:'', notes:'', staff:{}});
+      e.staff = e.staff || {};
+      const s = c.staff.find(x=>x.id===sid);
+      if (s && s.role==='aide') delete e.aideOverride; else delete e.clinOverride;
+      e.staff[sid] = {h: Math.round(v.h*100)/100, pto: Math.round(v.p*100)/100};
+      days.add(d); count++;
+    });
+  });
+  persist();
+  const wk = hrsImp.week; hrsImp = null;
+  toast(`Hours added for ${days.size} ${days.size===1?'day':'days'}`);
+  ui.ptype = 'week'; ui.anchor = parse(wk); go('dash');
+}
+
+/* ---------- boot ---------- */
+$('#nav').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) go(b.dataset.v); });
+$('#clinicSel').onchange = ev => { state.activeId = ev.target.value; ui.anchor = latestEntryDate(clinic()); persist(); render(); };
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (ui.view==='dash') render(); });
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+(async () => {
+  state = await load();
+  if (!state || !Array.isArray(state.clinics) || !state.clinics.length){ const sc = seedClinic(); state = {clinics:[sc], activeId:sc.id}; persist(); }
+  ui.anchor = latestEntryDate(clinic());
+  render();
+})();
+</script>
+</body>
+</html>

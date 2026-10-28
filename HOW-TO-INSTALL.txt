@@ -1,0 +1,35 @@
+CLINIC TRACKER - PUT IT ON YOUR HOME SCREEN
+
+1. PUT THE APP ONLINE (one time, free, about 2 minutes)
+   - Unzip this folder.
+   - Go to https://app.netlify.com/drop and drag the whole "clinic-app" folder onto the page.
+   - Netlify gives you a web address like https://something.netlify.app
+     (Make a free account if you want to keep the address permanently.)
+
+2. ADD IT TO YOUR HOME SCREEN
+   iPhone / iPad:  open the address in Safari > tap Share > "Add to Home Screen"
+   Android:        open the address in Chrome > tap the menu > "Install app"
+   Computer:       open the address in Chrome or Edge > click the install icon in the address bar
+
+3. GOOD TO KNOW
+   - Your entries are saved on each device, not online. Your phone and computer
+     will not share data on their own.
+   - To move data between devices: Settings > Download backup, then on the other
+     device Settings > Restore backup.
+   - Download a backup now and then. Deleting the app also deletes its data.
+   - Open the app once with internet after installing; after that it works offline.
+   - To update the app later, drag the new folder onto the same Netlify site.
+
+IMPORTING A DAY'S SCHEDULE
+   - Open Import, then drop in a screenshot or PDF of the day's provider schedule
+     (or paste a screenshot with Ctrl+V).
+   - Green time counts as not worked. Yellow 60-minute blocks count as evals.
+   - Status icons: green = signed note, yellow = checked in, red X = cancelled,
+     no icon = not checked in. Patients seen = signed notes + checked in.
+   - Pick the staff member for each column once; the app remembers the order.
+   - Reading PDFs and provider names from screenshots needs an internet connection.
+
+IMPORTING A WEEK OF STAFF HOURS
+   - Open Import > Staff hours (text). Paste a list or choose a .txt/.csv file.
+   - Lines like "Malik Tue 10-4", "Sabrina 10/27 12 to 8", "Emma Thu 6 hrs",
+     "Morgan Fri PTO", or a spreadsheet grid with days/dates across the top.
