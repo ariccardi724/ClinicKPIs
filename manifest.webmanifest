@@ -1,5 +1,5 @@
 {
-  "id": "clinic-staffing-tracker",
+  "id": "clinic-tracker-kpi",
   "name": "Clinic Staffing Tracker",
   "short_name": "Clinic Tracker",
   "description": "Log daily patients and staff hours, and track them against budget.",
@@ -10,41 +10,9 @@
   "background_color": "#03122B",
   "theme_color": "#03122B",
   "icons": [
-    {
-      "src": "kpi-icon-96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "kpi-icon-144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "kpi-icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "kpi-icon-256.png",
-      "sizes": "256x256",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "kpi-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "kpi-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "kpi-icon-96.png", "sizes": "96x96", "type": "image/png" },
+    { "src": "kpi-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "kpi-icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "kpi-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

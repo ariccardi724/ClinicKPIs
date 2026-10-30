@@ -862,21 +862,15 @@ function analyzeSchedule(cv){
   const dh = {}; diffs.forEach(d => dh[d]=(dh[d]||0)+1);
   const mode = +Object.entries(dh).sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0];
   const close = diffs.filter(d=>Math.abs(d-mode)<=2); const S0 = close.reduce((a,b)=>a+b,0)/close.length;
-  // longest run of lines spaced a whole number of rows apart; stray lines (block borders, text) are skipped
-  let best = null;
-  for (let i=0;i<peaks.length;i++){
-    const cur = [peaks[i]];
-    for (let j=i+1;j<peaks.length;j++){
-      const r = (peaks[j]-cur[cur.length-1])/S0, k = Math.round(r);
-      if (k>=1 && k<=8 && Math.abs(r-k)<0.18) cur.push(peaks[j]);
-      else if (k>8) break;
-    }
-    const score = c => c.length*1000 + (c[c.length-1]-c[0]);
-    if (!best || score(cur) > score(best)) best = cur;
+  let best = null, cur = [peaks[0]];
+  const flush = () => { if (!best || cur[cur.length-1]-cur[0] > best[best.length-1]-best[0]) best = cur.slice(); };
+  for (let i=1;i<peaks.length;i++){
+    const r = (peaks[i]-cur[cur.length-1])/S0, k = Math.round(r);
+    if (k>=1 && k<=8 && Math.abs(r-k)<0.18) cur.push(peaks[i]);
+    else if (k===0) continue;
+    else { flush(); cur=[peaks[i]]; }
   }
-  // the real grid starts and ends with full rows; drop stray lines (title, header) hanging off either end
-  while (best.length > 3 && best[1]-best[0] > 1.5*S0) best.shift();
-  while (best.length > 3 && best[best.length-1]-best[best.length-2] > 1.5*S0) best.pop();
+  flush();
   let gridTop = best[0], gridBot = best[best.length-1];
   // the last row's bottom border is often a darker table edge; extend while another row fits below
   for (let guard=0; guard<3; guard++){
@@ -958,7 +952,7 @@ function analyzeSchedule(cv){
     for (const [k,q] of Object.entries(SCHED_FILLS)){ const d = Math.abs(fill[0]-q[0])+Math.abs(fill[1]-q[1])+Math.abs(fill[2]-q[2]); if (d<fd && d<40){ fd=d; fk=k; } }
     let xr = fx; while (xr < cols[col].x1 && !lineLike(px(xr+1, Math.round(fy+(yb-fy)/2))) && !near(px(xr+1,fy),[228,222,187],12)) xr++;
     appts.push({col, x:c.x0, y:Math.round(gridTop+slot*S), w:Math.max(xr-c.x0+4, c.h*2), h:slots*S, slot, slots, fill:fk,
-      status: c.hue==='red' ? 'none' : 'visit', cancelled: c.hue==='red',
+      status: c.hue==='red' ? 'none' : 'visit',
       isEval: fk==='yellow' && slots>=4});
   }
   // 5b. colored blocks without a status icon = not checked in
@@ -989,23 +983,12 @@ function analyzeSchedule(cv){
 
   // 6. worked time per column: anything that isn't green
   cols = cols.map((k,ci) => {
-    const worked = [], busy = [];
+    const worked = [];
     for (let s=0;s<nSlots;s++){
-      const off = appts.filter(a => a.col===ci && a.cancelled && s>=a.slot && s<a.slot+a.slots);
-      let g=0,t=0,other=0;
-      for (const fr of [.3,.5,.7]){ const y = Math.round(gridTop+(s+fr)*S); for (let x=k.x0+2;x<k.x1-1;x+=2){ t++; const p = px(x,y);
-        if (isGreen(p)) g++; else if (!(chr(p)<12 && lm(p)>245) && !off.some(a => x>=a.x-3 && x<=a.x+a.w+2)) other++; } }
+      let g=0,t=0;
+      for (const fr of [.3,.5,.7]){ const y = Math.round(gridTop+(s+fr)*S); for (let x=k.x0+2;x<k.x1-1;x+=2){ t++; if (isGreen(px(x,y))) g++; } }
       const booked = appts.some(a => a.col===ci && s>=a.slot && s<a.slot+a.slots);
-      const real = appts.some(a => a.col===ci && !a.cancelled && s>=a.slot && s<a.slot+a.slots);
       worked.push(g/t < 0.5 || booked);
-      busy.push(real || other/t > 0.25);   // a real visit or an admin block, not just open time or cancellations
-    }
-    // a stretch of time with only open slots or cancellations (no visits, no admin) wasn't worked
-    for (let s=0;s<nSlots;){
-      if (!worked[s]){ s++; continue; }
-      let e = s; while (e<nSlots && worked[e]) e++;
-      if (!busy.slice(s,e).some(Boolean)) for (let q=s;q<e;q++) worked[q] = false;
-      s = e;
     }
     return {...k, worked};
   });
@@ -1058,10 +1041,6 @@ async function ocrHeaders(cv, r){
     const g = document.createElement('canvas'); g.width = gw*sc; g.height = gh*sc; g.getContext('2d').drawImage(cv, gx, gy, gw, gh, 0, 0, gw*sc, gh*sc);
     const {data} = await worker.recognize(g);
     (data.words||[]).forEach(w => words.push({str:w.text, x:gx + w.bbox.x0/sc, x1:gx + w.bbox.x1/sc, y:gy + w.bbox.y1/sc}));
-    const tw = Math.max(10, r.cols[0].x0), tc = document.createElement('canvas'); tc.width = tw*3; tc.height = gh*3;
-    tc.getContext('2d').drawImage(cv, 0, gy, tw, gh, 0, 0, tw*3, gh*3);
-    const tr = await worker.recognize(tc), lines = (tr.data.lines||[]);
-    lines.forEach(l => words.push({str:l.text.trim(), x:l.bbox.x0/3, x1:l.bbox.x1/3, y:gy + l.bbox.y1/3}));
   } catch(e){ /* appointment text is optional */ }
   await worker.terminate();
   return {heads, title:t.text, words};
@@ -1118,7 +1097,6 @@ async function handleScheduleFile(file){
     const r = analyzeSchedule(loaded.cv);
     r.appts.forEach(a => { if (a.isEval) a.ieWhy = 'yellow'; });
     if (loaded.words) tagIEsFromText(r, loaded.words);
-    const autoStart = loaded.words ? detectStart(r, loaded.words) : null;
     const heads = r.cols.map(k => loaded.words ? loaded.words.filter(w => w.x>=k.x0-2 && w.x<k.x1 && w.y>r.headerTop-2 && w.y<=r.gridTop+2).map(w=>w.str).join(' ').replace(/\s+/g,' ').trim() : '');
     const saved = c.settings.schedMap || [];
     imp = {
@@ -1126,14 +1104,13 @@ async function handleScheduleFile(file){
       map: r.cols.map((k,i) => matchStaff(c, heads[i]) || saved[i] || ''),
       hours: r.cols.map(k => k.worked.filter(Boolean).length/4),
       date: parseDateText(loaded.words ? [...loaded.words].filter(w=>w.y<r.headerTop+2).sort((a,b)=>a.y-b.y).map(w=>w.str).join(' ').match(/\d{1,2}-\d{1,2}-\d{2,4}/)?.[0] : null) || parseDateText(file.name) || ui.logDate,
-      ocr: loaded.words ? 'done' : 'pending', start: autoStart
+      ocr: loaded.words ? 'done' : 'pending'
     };
     renderImportResult();
     if (!loaded.words){
       ocrHeaders(loaded.cv, r).then(({heads, title, words}) => {
         if (!imp || imp.cv !== loaded.cv) return;
         const found = words && words.length ? tagIEsFromText(imp.r, words) : 0;
-        if (!imp.userStart){ const st = detectStart(imp.r, words); if (st != null) imp.start = st; }
         if (found) toast(`${found} more ${found===1?'IE':'IEs'} found from appointment types`);
         imp.heads = heads; imp.ocr = 'done';
         imp.map = imp.map.map((m,i) => imp.userMapped?.[i] ? m : (matchStaff(c, heads[i]) || m));
@@ -1149,28 +1126,8 @@ async function handleScheduleFile(file){
   }
 }
 
-// read the "7 AM" style labels in the time column to find when the first row starts
-function detectStart(r, words){
-  const votes = {}, ws = [...(words || [])];
-  // the hour and "AM"/"PM" are often separate pieces of text; put them back together
-  for (const w of words || []){
-    if (!/^\d{1,2}$/.test(String(w.str).trim())) continue;
-    const ap = (words||[]).find(q => /^[AP]\.?M\.?$/i.test(String(q.str).trim()) && q.x > w.x && q.x - w.x < r.S*2.5 && Math.abs(q.y - w.y) < r.S*0.4);
-    if (ap) ws.push({str:`${String(w.str).trim()} ${String(ap.str).trim()}`, x:w.x, y:Math.max(w.y, ap.y)});
-  }
-  for (const w of ws){
-    const m = String(w.str).trim().match(/^(\d{1,2})\s*([AP])\.?M\.?$/i); if (!m) continue;
-    if (w.x > r.cols[0].x0 + 2) continue;
-    const slot = Math.floor((w.y - r.gridTop)/r.S); if (slot < 0 || slot >= r.nSlots) continue;
-    const mins = (+m[1] % 12)*60 + (m[2].toUpperCase()==='P' ? 720 : 0) - slot*15;
-    if (mins >= 0 && mins < 1440) votes[mins] = (votes[mins]||0) + 1;
-  }
-  const best = Object.entries(votes).sort((a,b)=>b[1]-a[1])[0];
-  return best ? +best[0] : null;
-}
-function schedStart(){ return imp && imp.start != null ? imp.start : num(clinic().settings.schedStart ?? 360); }
 function fmtSlot(slot){
-  const start = schedStart();
+  const start = num(clinic().settings.schedStart ?? 360);
   const m = start + slot*15, h = Math.floor(m/60)%24, mm = m%60;
   return `${((h+11)%12)+1}:${pad(mm)} ${h<12?'AM':'PM'}`;
 }
@@ -1217,7 +1174,7 @@ function renderImportResult(){
   const c = clinic(), r = imp.r, {per, tot} = importTotals();
   const clin = c.staff.filter(s=>s.role==='clinician' && s.active);
   const startOpts = []; for (let m=300;m<=600;m+=15) startOpts.push(m);
-  const start = schedStart();
+  const start = num(c.settings.schedStart ?? 360);
   const hoursTot = imp.hours.reduce((a,b)=>a+num(b),0);
   out.innerHTML = `
     <section class="panel" style="margin-top:18px">
@@ -1235,7 +1192,7 @@ function renderImportResult(){
         <tbody>${r.cols.map((k,i)=>`<tr>
           <td>${esc(imp.heads[i] || `Column ${i+1}`)}</td>
           <td><select data-map="${i}" aria-label="Staff member for column ${i+1}"><option value="">Don't add hours</option>${clin.map(s=>`<option value="${s.id}" ${imp.map[i]===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}<option value="__new">Add new clinician…</option></select></td>
-          <td><input type="number" min="0" step="0.25" data-hrs="${i}" value="${imp.hours[i]}" aria-label="Hours worked, column ${i+1}" style="width:90px"> <span class="muted" style="font-size:13px">${(()=>{const w=r.cols[i].worked, a=w.indexOf(true), b=w.lastIndexOf(true); return a<0?"":`${fmtSlot(a)} – ${fmtSlot(b+1)}`;})()}</span></td>
+          <td><input type="number" min="0" step="0.25" data-hrs="${i}" value="${imp.hours[i]}" aria-label="Hours worked, column ${i+1}" style="width:90px"></td>
           <td class="vis"><b>${per[i].counted}</b></td><td class="ie"><b>${per[i].evals}</b></td></tr>`).join('')}
           <tr><td class="tot">Total</td><td class="tot"></td><td class="tot">${f1(hoursTot)}</td><td class="tot vis">${tot.counted}</td><td class="tot ie">${tot.evals}</td></tr>
         </tbody></table></div>
@@ -1257,7 +1214,7 @@ function renderImportResult(){
     </section>`;
   drawImportOverlay();
   $('#impDate').onchange = ev => { imp.date = ev.target.value; imp.userDate = true; };
-  $('#impStart').onchange = ev => { imp.start = +ev.target.value; imp.userStart = true; c.settings.schedStart = imp.start; persist(); renderImportResult(); };
+  $('#impStart').onchange = ev => { c.settings.schedStart = +ev.target.value; persist(); renderImportResult(); };
   document.querySelectorAll('[data-map]').forEach(s => s.onchange = () => {
     const i = +s.dataset.map;
     if (s.value==='__new'){
