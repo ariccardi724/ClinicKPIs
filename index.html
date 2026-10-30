@@ -131,6 +131,9 @@ table.sheet{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
 .field label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:5px}
 .field input{font-size:20px;font-weight:700;padding:10px 12px}
 .staffrows{display:grid;grid-template-columns:1fr 96px 96px;gap:6px 10px;align-items:center}
+.staffrows.clinician{grid-template-columns:1fr 70px 70px 90px 90px}
+.staffrows input.vis{color:var(--visit)} .staffrows input.ie{color:var(--ie)}
+@media (max-width:520px){.staffrows.clinician{grid-template-columns:1fr 52px 52px 70px 64px}}
 .staffrows .h{font-size:12.5px;color:var(--ink-2);text-align:right}
 .staffrows .h:first-child{text-align:left}
 .staffrows .nm{font-weight:600}
@@ -170,6 +173,15 @@ table.sheet{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
 .overlaywrap{overflow:auto;max-height:75vh;border-radius:var(--r-md);border:1px solid var(--line);background:#fff}
 #impCanvas{display:block;width:100%;min-width:640px;cursor:pointer}
 details summary{cursor:pointer;font-weight:600}
+.rptdlg{border:1px solid var(--line);border-radius:var(--r-lg);background:#0A1F45;color:var(--ink);padding:0;width:min(560px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.rptdlg::backdrop{background:rgba(2,8,20,.7);backdrop-filter:blur(3px)}
+.rptin{padding:20px 22px}
+.rptin .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.rptin h2{font-size:20px} .rptin h3{font-size:13px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 6px}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:9px 10px;border-radius:var(--r-sm);cursor:pointer}
+.opt:hover{background:var(--surface-2)} .opt input{margin-top:3px;width:18px;height:18px;accent-color:#4DF5A0}
+.opt span{display:flex;flex-direction:column} .opt small{color:var(--ink-2);font-size:13px}
+.fmts{display:flex;gap:10px;flex-wrap:wrap}.fmts .btn{min-width:120px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 #hwText{font-variant-numeric:tabular-nums}
 .empty p{color:var(--ink-2);margin:6px 0 16px}
@@ -352,9 +364,9 @@ function dayCalc(c, k){
   let sc=0, sa=0, pc=0, pa=0; const byStaff = {};
   for (const [id,v] of Object.entries(e.staff||{})){
     const s = c.staff.find(x=>x.id===id); if (!s) continue;
-    const h = num(v.h), p = num(v.pto);
+    const h = num(v.h), p = num(v.pto), vv = num(v.v), ie = num(v.ie);
     if (s.role==='clinician'){ sc+=h; pc+=p; } else { sa+=h; pa+=p; }
-    if (h||p) byStaff[id] = {h,p};
+    if (h||p||vv||ie) byStaff[id] = {h,p,v:vv,ie,hasV: v.v!=null && v.v!==''};
   }
   const clin = sc>0 ? sc : num(e.clinOverride);
   const aide = sa>0 ? sa : num(e.aideOverride);
@@ -370,7 +382,7 @@ function aggRange(c, start, end){
     const r = dayCalc(c, dkey(d)); if (!r) continue;
     t.days++;
     for (const k of ['pts','nps','clin','aide','allowClin','allowAide','overClin','overAide','ptoClin','ptoAide','payClin','payAide']) t[k]+=r[k];
-    for (const [id,v] of Object.entries(r.byStaff)){ t.byStaff[id] = t.byStaff[id] || {h:0,p:0}; t.byStaff[id].h+=v.h; t.byStaff[id].p+=v.p; }
+    for (const [id,v] of Object.entries(r.byStaff)){ const b = t.byStaff[id] = t.byStaff[id] || {h:0,p:0,v:0,ie:0,days:0,hv:0,vDays:0}; b.h+=v.h; b.p+=v.p; b.v+=v.v; b.ie+=v.ie; if (v.h) b.days++; if (v.hasV){ b.hv+=v.h; b.vDays++; } }
   }
   return t;
 }
@@ -450,7 +462,7 @@ function renderDashboard(){
         <button class="btn icon" id="prevP" aria-label="Previous period">‹</button>
         <button class="btn" id="todayP">Latest</button>
         <button class="btn icon" id="nextP" aria-label="Next period">›</button>
-        <button class="btn" id="csvBtn" ${t.days?'':'disabled'}>Export CSV</button>
+        <button class="btn primary" id="csvBtn">Share report</button>
       </div>
     </div>`;
   if (!t.days){
@@ -487,12 +499,7 @@ function bindDashControls(c, p, buckets, t){
   $('#prevP').onclick = () => { shiftAnchor(-1); render(); };
   $('#nextP').onclick = () => { shiftAnchor(1); render(); };
   $('#todayP').onclick = () => { ui.anchor = latestEntryDate(c); render(); };
-  $('#csvBtn').onclick = () => {
-    const rows = sheetTable(c, buckets, t).rows;
-    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-    download(`${c.name} ${p.label}.csv`, csv, 'text/csv');
-    toast('CSV exported');
-  };
+  $('#csvBtn').onclick = openReportDialog;
 }
 function sheetTable(c, buckets, t){
   const cols = buckets.map(b=>b.label);
@@ -595,14 +602,17 @@ function renderLog(){
     const ov = role==='clinician' ? e.clinOverride : e.aideOverride;
     const rows = ppl.map(s => {
       const v = (e.staff||{})[s.id] || {};
-      return `<div class="nm ${s.active?'':'arch'}">${esc(s.name)}${s.active?'':' (archived)'}</div>
+      const extra = role==='clinician' ? `
+        <input type="number" min="0" step="1" inputmode="numeric" class="vis" data-sid="${s.id}" data-f="v" value="${v.v||''}" aria-label="${esc(s.name)} visits">
+        <input type="number" min="0" step="1" inputmode="numeric" class="ie" data-sid="${s.id}" data-f="ie" value="${v.ie||''}" aria-label="${esc(s.name)} IEs">` : '';
+      return `<div class="nm ${s.active?'':'arch'}">${esc(s.name)}${s.active?'':' (archived)'}</div>${extra}
         <input type="number" min="0" step="0.25" inputmode="decimal" data-sid="${s.id}" data-f="h" value="${v.h||''}" aria-label="${esc(s.name)} hours worked">
         <input type="number" min="0" step="0.25" inputmode="decimal" data-sid="${s.id}" data-f="pto" value="${v.pto||''}" aria-label="${esc(s.name)} PTO hours">`;
     }).join('');
     return `<section class="panel">
       <div class="hd"><h2>${role==='clinician'?'Clinicians':'Aides'}</h2></div>
-      ${ppl.length ? `<div class="staffrows"><div class="h">Name</div><div class="h">Worked</div><div class="h">PTO</div>${rows}
-        <div class="totrow">Total worked</div><div class="totval" id="tot-${role}"></div><div></div></div>` : `<p class="muted">No ${role==='clinician'?'clinicians':'aides'} yet. <a href="#" data-go="staff">Add staff</a></p>`}
+      ${ppl.length ? `<div class="staffrows ${role}"><div class="h">Name</div>${role==='clinician'?'<div class="h vis">Visits</div><div class="h ie">IEs</div>':''}<div class="h">Worked</div><div class="h">PTO</div>${rows}
+        <div class="totrow">Total</div>${role==='clinician'?'<div class="totval vis" id="totv"></div><div class="totval ie" id="totie"></div>':''}<div class="totval" id="tot-${role}"></div><div></div></div>` : `<p class="muted">No ${role==='clinician'?'clinicians':'aides'} yet. <a href="#" data-go="staff">Add staff</a></p>`}
       <div class="field" style="margin-top:12px" id="ovwrap-${role}">
         <label for="ov-${role}">Day total, if you're not entering hours by person</label>
         <input type="number" min="0" step="0.25" inputmode="decimal" id="ov-${role}" value="${ov ?? ''}" style="font-size:15px;font-weight:600">
@@ -665,6 +675,8 @@ function renderLog(){
     for (const role of ['clinician','aide']){
       const sum = Object.entries(ent.staff||{}).reduce((a,[id,v]) => { const s = c.staff.find(x=>x.id===id); return s && s.role===role ? a + num(v.h) : a; }, 0);
       const tot = $(`#tot-${role}`); if (tot) tot.textContent = f1(sum);
+      if (role==='clinician'){ const sv = Object.values(ent.staff||{}).reduce((t,v)=>t+num(v.v),0), si = Object.values(ent.staff||{}).reduce((t,v)=>t+num(v.ie),0);
+        if ($('#totv')) $('#totv').textContent = sv ? f0(sv) : ''; if ($('#totie')) $('#totie').textContent = si ? f0(si) : ''; }
       const wrap = $(`#ovwrap-${role}`); if (wrap) wrap.style.display = sum > 0 ? 'none' : '';
     }
     const meter = (label, worked, allowed, over, color) => {
@@ -681,7 +693,14 @@ function renderLog(){
     const sd = c.entries[ui.logDate];
     $('#savedNote').textContent = sd ? 'Saved automatically' : 'Start typing to log this day';
   };
+  const sumF = f => [...document.querySelectorAll(`[data-f="${f}"]`)].reduce((a,i)=>a+num(i.value),0);
+  let lastV = sumF('v'), lastIE = sumF('ie');
   $('#main').querySelectorAll('input:not(#dateIn), textarea').forEach(inp => inp.addEventListener('input', () => {
+    if (inp.dataset.f==='v' || inp.dataset.f==='ie'){
+      const f = inp.dataset.f, tot = f==='v' ? $('#ptsIn') : $('#npsIn'), sNew = sumF(f), sOld = f==='v' ? lastV : lastIE;
+      if (tot.value==='' || num(tot.value)===sOld) tot.value = sNew || '';
+      if (f==='v') lastV = sNew; else lastIE = sNew;
+    }
     const entry = readForm();
     if (entry) c.entries[ui.logDate] = entry; else delete c.entries[ui.logDate];
     persist(); refresh();
@@ -862,15 +881,21 @@ function analyzeSchedule(cv){
   const dh = {}; diffs.forEach(d => dh[d]=(dh[d]||0)+1);
   const mode = +Object.entries(dh).sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0];
   const close = diffs.filter(d=>Math.abs(d-mode)<=2); const S0 = close.reduce((a,b)=>a+b,0)/close.length;
-  let best = null, cur = [peaks[0]];
-  const flush = () => { if (!best || cur[cur.length-1]-cur[0] > best[best.length-1]-best[0]) best = cur.slice(); };
-  for (let i=1;i<peaks.length;i++){
-    const r = (peaks[i]-cur[cur.length-1])/S0, k = Math.round(r);
-    if (k>=1 && k<=8 && Math.abs(r-k)<0.18) cur.push(peaks[i]);
-    else if (k===0) continue;
-    else { flush(); cur=[peaks[i]]; }
+  // longest run of lines spaced a whole number of rows apart; stray lines (block borders, text) are skipped
+  let best = null;
+  for (let i=0;i<peaks.length;i++){
+    const cur = [peaks[i]];
+    for (let j=i+1;j<peaks.length;j++){
+      const r = (peaks[j]-cur[cur.length-1])/S0, k = Math.round(r);
+      if (k>=1 && k<=8 && Math.abs(r-k)<0.18) cur.push(peaks[j]);
+      else if (k>8) break;
+    }
+    const score = c => c.length*1000 + (c[c.length-1]-c[0]);
+    if (!best || score(cur) > score(best)) best = cur;
   }
-  flush();
+  // the real grid starts and ends with full rows; drop stray lines (title, header) hanging off either end
+  while (best.length > 3 && best[1]-best[0] > 1.5*S0) best.shift();
+  while (best.length > 3 && best[best.length-1]-best[best.length-2] > 1.5*S0) best.pop();
   let gridTop = best[0], gridBot = best[best.length-1];
   // the last row's bottom border is often a darker table edge; extend while another row fits below
   for (let guard=0; guard<3; guard++){
@@ -952,7 +977,7 @@ function analyzeSchedule(cv){
     for (const [k,q] of Object.entries(SCHED_FILLS)){ const d = Math.abs(fill[0]-q[0])+Math.abs(fill[1]-q[1])+Math.abs(fill[2]-q[2]); if (d<fd && d<40){ fd=d; fk=k; } }
     let xr = fx; while (xr < cols[col].x1 && !lineLike(px(xr+1, Math.round(fy+(yb-fy)/2))) && !near(px(xr+1,fy),[228,222,187],12)) xr++;
     appts.push({col, x:c.x0, y:Math.round(gridTop+slot*S), w:Math.max(xr-c.x0+4, c.h*2), h:slots*S, slot, slots, fill:fk,
-      status: c.hue==='red' ? 'none' : 'visit',
+      status: c.hue==='red' ? 'none' : 'visit', cancelled: c.hue==='red',
       isEval: fk==='yellow' && slots>=4});
   }
   // 5b. colored blocks without a status icon = not checked in
@@ -983,12 +1008,23 @@ function analyzeSchedule(cv){
 
   // 6. worked time per column: anything that isn't green
   cols = cols.map((k,ci) => {
-    const worked = [];
+    const worked = [], busy = [];
     for (let s=0;s<nSlots;s++){
-      let g=0,t=0;
-      for (const fr of [.3,.5,.7]){ const y = Math.round(gridTop+(s+fr)*S); for (let x=k.x0+2;x<k.x1-1;x+=2){ t++; if (isGreen(px(x,y))) g++; } }
+      const off = appts.filter(a => a.col===ci && a.cancelled && s>=a.slot && s<a.slot+a.slots);
+      let g=0,t=0,other=0;
+      for (const fr of [.3,.5,.7]){ const y = Math.round(gridTop+(s+fr)*S); for (let x=k.x0+2;x<k.x1-1;x+=2){ t++; const p = px(x,y);
+        if (isGreen(p)) g++; else if (!(chr(p)<12 && lm(p)>245) && !off.some(a => x>=a.x-3 && x<=a.x+a.w+2)) other++; } }
       const booked = appts.some(a => a.col===ci && s>=a.slot && s<a.slot+a.slots);
+      const real = appts.some(a => a.col===ci && !a.cancelled && s>=a.slot && s<a.slot+a.slots);
       worked.push(g/t < 0.5 || booked);
+      busy.push(real || other/t > 0.25);   // a real visit or an admin block, not just open time or cancellations
+    }
+    // a stretch of time with only open slots or cancellations (no visits, no admin) wasn't worked
+    for (let s=0;s<nSlots;){
+      if (!worked[s]){ s++; continue; }
+      let e = s; while (e<nSlots && worked[e]) e++;
+      if (!busy.slice(s,e).some(Boolean)) for (let q=s;q<e;q++) worked[q] = false;
+      s = e;
     }
     return {...k, worked};
   });
@@ -1041,6 +1077,10 @@ async function ocrHeaders(cv, r){
     const g = document.createElement('canvas'); g.width = gw*sc; g.height = gh*sc; g.getContext('2d').drawImage(cv, gx, gy, gw, gh, 0, 0, gw*sc, gh*sc);
     const {data} = await worker.recognize(g);
     (data.words||[]).forEach(w => words.push({str:w.text, x:gx + w.bbox.x0/sc, x1:gx + w.bbox.x1/sc, y:gy + w.bbox.y1/sc}));
+    const tw = Math.max(10, r.cols[0].x0), tc = document.createElement('canvas'); tc.width = tw*3; tc.height = gh*3;
+    tc.getContext('2d').drawImage(cv, 0, gy, tw, gh, 0, 0, tw*3, gh*3);
+    const tr = await worker.recognize(tc), lines = (tr.data.lines||[]);
+    lines.forEach(l => words.push({str:l.text.trim(), x:l.bbox.x0/3, x1:l.bbox.x1/3, y:gy + l.bbox.y1/3}));
   } catch(e){ /* appointment text is optional */ }
   await worker.terminate();
   return {heads, title:t.text, words};
@@ -1097,6 +1137,7 @@ async function handleScheduleFile(file){
     const r = analyzeSchedule(loaded.cv);
     r.appts.forEach(a => { if (a.isEval) a.ieWhy = 'yellow'; });
     if (loaded.words) tagIEsFromText(r, loaded.words);
+    const autoStart = loaded.words ? detectStart(r, loaded.words) : null;
     const heads = r.cols.map(k => loaded.words ? loaded.words.filter(w => w.x>=k.x0-2 && w.x<k.x1 && w.y>r.headerTop-2 && w.y<=r.gridTop+2).map(w=>w.str).join(' ').replace(/\s+/g,' ').trim() : '');
     const saved = c.settings.schedMap || [];
     imp = {
@@ -1104,13 +1145,14 @@ async function handleScheduleFile(file){
       map: r.cols.map((k,i) => matchStaff(c, heads[i]) || saved[i] || ''),
       hours: r.cols.map(k => k.worked.filter(Boolean).length/4),
       date: parseDateText(loaded.words ? [...loaded.words].filter(w=>w.y<r.headerTop+2).sort((a,b)=>a.y-b.y).map(w=>w.str).join(' ').match(/\d{1,2}-\d{1,2}-\d{2,4}/)?.[0] : null) || parseDateText(file.name) || ui.logDate,
-      ocr: loaded.words ? 'done' : 'pending'
+      ocr: loaded.words ? 'done' : 'pending', start: autoStart
     };
     renderImportResult();
     if (!loaded.words){
       ocrHeaders(loaded.cv, r).then(({heads, title, words}) => {
         if (!imp || imp.cv !== loaded.cv) return;
         const found = words && words.length ? tagIEsFromText(imp.r, words) : 0;
+        if (!imp.userStart){ const st = detectStart(imp.r, words); if (st != null) imp.start = st; }
         if (found) toast(`${found} more ${found===1?'IE':'IEs'} found from appointment types`);
         imp.heads = heads; imp.ocr = 'done';
         imp.map = imp.map.map((m,i) => imp.userMapped?.[i] ? m : (matchStaff(c, heads[i]) || m));
@@ -1126,8 +1168,28 @@ async function handleScheduleFile(file){
   }
 }
 
+// read the "7 AM" style labels in the time column to find when the first row starts
+function detectStart(r, words){
+  const votes = {}, ws = [...(words || [])];
+  // the hour and "AM"/"PM" are often separate pieces of text; put them back together
+  for (const w of words || []){
+    if (!/^\d{1,2}$/.test(String(w.str).trim())) continue;
+    const ap = (words||[]).find(q => /^[AP]\.?M\.?$/i.test(String(q.str).trim()) && q.x > w.x && q.x - w.x < r.S*2.5 && Math.abs(q.y - w.y) < r.S*0.4);
+    if (ap) ws.push({str:`${String(w.str).trim()} ${String(ap.str).trim()}`, x:w.x, y:Math.max(w.y, ap.y)});
+  }
+  for (const w of ws){
+    const m = String(w.str).trim().match(/^(\d{1,2})\s*([AP])\.?M\.?$/i); if (!m) continue;
+    if (w.x > r.cols[0].x0 + 2) continue;
+    const slot = Math.floor((w.y - r.gridTop)/r.S); if (slot < 0 || slot >= r.nSlots) continue;
+    const mins = (+m[1] % 12)*60 + (m[2].toUpperCase()==='P' ? 720 : 0) - slot*15;
+    if (mins >= 0 && mins < 1440) votes[mins] = (votes[mins]||0) + 1;
+  }
+  const best = Object.entries(votes).sort((a,b)=>b[1]-a[1])[0];
+  return best ? +best[0] : null;
+}
+function schedStart(){ return imp && imp.start != null ? imp.start : num(clinic().settings.schedStart ?? 360); }
 function fmtSlot(slot){
-  const start = num(clinic().settings.schedStart ?? 360);
+  const start = schedStart();
   const m = start + slot*15, h = Math.floor(m/60)%24, mm = m%60;
   return `${((h+11)%12)+1}:${pad(mm)} ${h<12?'AM':'PM'}`;
 }
@@ -1174,7 +1236,7 @@ function renderImportResult(){
   const c = clinic(), r = imp.r, {per, tot} = importTotals();
   const clin = c.staff.filter(s=>s.role==='clinician' && s.active);
   const startOpts = []; for (let m=300;m<=600;m+=15) startOpts.push(m);
-  const start = num(c.settings.schedStart ?? 360);
+  const start = schedStart();
   const hoursTot = imp.hours.reduce((a,b)=>a+num(b),0);
   out.innerHTML = `
     <section class="panel" style="margin-top:18px">
@@ -1192,7 +1254,7 @@ function renderImportResult(){
         <tbody>${r.cols.map((k,i)=>`<tr>
           <td>${esc(imp.heads[i] || `Column ${i+1}`)}</td>
           <td><select data-map="${i}" aria-label="Staff member for column ${i+1}"><option value="">Don't add hours</option>${clin.map(s=>`<option value="${s.id}" ${imp.map[i]===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}<option value="__new">Add new clinician…</option></select></td>
-          <td><input type="number" min="0" step="0.25" data-hrs="${i}" value="${imp.hours[i]}" aria-label="Hours worked, column ${i+1}" style="width:90px"></td>
+          <td><input type="number" min="0" step="0.25" data-hrs="${i}" value="${imp.hours[i]}" aria-label="Hours worked, column ${i+1}" style="width:90px"> <span class="muted" style="font-size:13px">${(()=>{const w=r.cols[i].worked, a=w.indexOf(true), b=w.lastIndexOf(true); return a<0?"":`${fmtSlot(a)} – ${fmtSlot(b+1)}`;})()}</span></td>
           <td class="vis"><b>${per[i].counted}</b></td><td class="ie"><b>${per[i].evals}</b></td></tr>`).join('')}
           <tr><td class="tot">Total</td><td class="tot"></td><td class="tot">${f1(hoursTot)}</td><td class="tot vis">${tot.counted}</td><td class="tot ie">${tot.evals}</td></tr>
         </tbody></table></div>
@@ -1214,7 +1276,7 @@ function renderImportResult(){
     </section>`;
   drawImportOverlay();
   $('#impDate').onchange = ev => { imp.date = ev.target.value; imp.userDate = true; };
-  $('#impStart').onchange = ev => { c.settings.schedStart = +ev.target.value; persist(); renderImportResult(); };
+  $('#impStart').onchange = ev => { imp.start = +ev.target.value; imp.userStart = true; c.settings.schedStart = imp.start; persist(); renderImportResult(); };
   document.querySelectorAll('[data-map]').forEach(s => s.onchange = () => {
     const i = +s.dataset.map;
     if (s.value==='__new'){
@@ -1260,7 +1322,8 @@ function applyImport(){
   imp.r.cols.forEach((k,i) => {
     const sid = imp.map[i];
     if (!sid){ if (num(imp.hours[i])>0) missing.push(imp.heads[i] || `Column ${i+1}`); return; }
-    e.staff[sid] = {...(e.staff[sid]||{}), h:num(imp.hours[i])};
+    const pc = importTotals().per[i];
+    e.staff[sid] = {...(e.staff[sid]||{}), h:num(imp.hours[i]), v:pc.counted, ie:pc.evals};
   });
   if (missing.length && !confirm(`No staff member is picked for ${missing.join(', ')}, so those hours won't be added. Continue?`)) return;
   if (c.entries[date] && (c.entries[date].pts!=='' && c.entries[date].pts!=null) && !confirm(`${date} already has entries. Replace visits, IEs, and these clinicians' hours?`)) return;
@@ -1503,6 +1566,529 @@ function applyHours(){
   const wk = hrsImp.week; hrsImp = null;
   toast(`Hours added for ${days.size} ${days.size===1?'day':'days'}`);
   ui.ptype = 'week'; ui.anchor = parse(wk); go('dash');
+}
+
+/* ---------- reports to share: PDF, Excel, PowerPoint ---------- */
+const RC = {navy:'#0B1F45', ink:'#1B2A3A', muted:'#5B6B80', line:'#D5DEE8', band:'#EEF3F8', visit:'#0E9FB0', ie:'#C08A00',
+            over:'#C8324F', under:'#1E9E6A', clin:'#2E9F7A', clinSoft:'#A9DCCB', aide:'#3D6FE0', aideSoft:'#B5C8F5'};
+const LIBS = {
+  pdf:  ['pdf-lib.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'],
+  pptx: ['pptxgen.bundle.js', 'https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js'],
+  zip:  ['pptxgen.bundle.js', 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js']
+};
+async function loadLib(kind, test){
+  if (test()) return;
+  for (const src of LIBS[kind]){ try { await loadScript(src); if (test()) return; } catch(e){ /* try the next copy */ } }
+  throw new Error('lib');
+}
+function prevAnchorOf(type, a){
+  if (type==='day') return addDays(a,-1);
+  if (type==='week') return addDays(a,-7);
+  if (type==='month') return new Date(a.getFullYear(), a.getMonth()-1, 1);
+  if (type==='quarter') return new Date(a.getFullYear(), a.getMonth()-3, 1);
+  return new Date(a.getFullYear()-1, 0, 1);
+}
+const PREV_NAME = {day:'previous day', week:'last week', month:'last month', quarter:'last quarter', year:'last year'};
+const pctChange = (cur, prev) => prev ? (cur-prev)/Math.abs(prev) : null;
+const fmtPct = v => v==null ? '' : `${v>0?'+':''}${Math.round(v*100)}%`;
+const fmtHrs = n => (Math.round(n*10)/10).toFixed(1);
+const fmtVar = n => { const r = Math.round(n*10)/10; return r===0 ? 'On budget' : r>0 ? `${r.toFixed(1)} over` : `${(-r).toFixed(1)} under`; };
+
+function reportData(c, ptype, anchor){
+  const p = periodInfo(ptype, anchor);
+  const tp = ptype==='day' ? periodInfo('week', anchor) : p;
+  let buckets = tp.buckets.map(b => ({...b, ...aggRange(c, b.start, b.end)}));
+  if (tp.buckets.length===7) buckets = buckets.filter(b => !b.sunday || b.days>0);
+  const tot = aggRange(c, p.start, p.end);
+  const pp = periodInfo(ptype, prevAnchorOf(ptype, anchor));
+  const prev = aggRange(c, pp.start, pp.end);
+  const rate = num(c.settings.ptsPerClinHr) || 1;
+  const people = c.staff.filter(s => tot.byStaff[s.id]).map(s => {
+    const b = tot.byStaff[s.id], pb = prev.byStaff[s.id] || {h:0,p:0,v:0,ie:0,vDays:0};
+    // productivity only uses days where this person's visits were recorded
+    const known = s.role==='clinician' && b.vDays > 0;
+    const allowed = known ? b.v/rate : null;
+    return {name:s.name, role:s.role, h:b.h, pto:b.p, v:known ? b.v : null, ie:known ? b.ie : null, vph: known && b.hv ? b.v/b.hv : null, allowed,
+            over: known ? b.hv - allowed : null, prevV: pb.vDays ? pb.v : null, prevH: pb.h, prevIE: pb.ie, partial: known && b.vDays < b.days};
+  }).sort((a,b) => (a.role===b.role ? 0 : a.role==='clinician' ? -1 : 1) || b.h-a.h);
+  const days = [];
+  for (let d = new Date(p.start); d <= p.end; d = addDays(d,1)){ const r = dayCalc(c, dkey(d)); if (r) days.push({date:new Date(d), ...r}); }
+  const staffInDays = c.staff.filter(s => days.some(d => d.byStaff[s.id] && (d.byStaff[s.id].h || d.byStaff[s.id].p)));
+  return {c, ptype, p, tp, buckets, tot, prev, pp, people, days, staffInDays, rate, census:censusFor(c, p.end),
+          perHr: tot.clin ? tot.pts/tot.clin : 0, prevPerHr: prev.clin ? prev.pts/prev.clin : 0, hasPrev: prev.days>0};
+}
+function summaryRows(R){
+  const t = R.tot, pv = R.prev;
+  return [
+    {k:'Visits', cur:t.pts, prev:pv.pts, f:f0, color:RC.visit},
+    {k:'IEs', cur:t.nps, prev:pv.nps, f:f0, color:RC.ie},
+    {k:'Clinician hours', cur:t.clin, prev:pv.clin, f:fmtHrs},
+    {k:'Allowed clinician hours', cur:t.allowClin, prev:pv.allowClin, f:fmtHrs},
+    {k:'Clinician hours over / under', cur:t.overClin, prev:pv.overClin, f:fmtVar, variance:true},
+    {k:'Aide hours', cur:t.aide, prev:pv.aide, f:fmtHrs},
+    {k:'Allowed aide hours', cur:t.allowAide, prev:pv.allowAide, f:fmtHrs},
+    {k:'Aide hours over / under', cur:t.overAide, prev:pv.overAide, f:fmtVar, variance:true},
+    {k:'Visits per clinician hour', cur:R.perHr, prev:R.prevPerHr, f:n=>n.toFixed(2)},
+    {k:'Payroll hours (PTO incl.)', cur:t.payClin+t.payAide, prev:pv.payClin+pv.payAide, f:fmtHrs},
+  ];
+}
+
+/* ----- charts drawn to images (for PDF and Excel) ----- */
+function chartPNG({labels, series, title, w=760, h=380, horizontal=false}){
+  const sc = 2, cv = document.createElement('canvas'); cv.width = w*sc; cv.height = h*sc;
+  const g = cv.getContext('2d'); g.scale(sc,sc);
+  const font = (sz, wt='400') => `${wt} ${sz}px "Segoe UI", Arial, sans-serif`;
+  g.fillStyle = '#fff'; g.fillRect(0,0,w,h);
+  g.fillStyle = RC.ink; g.font = font(18,'700'); g.fillText(title, 16, 28);
+  // legend
+  let lx = 16; g.font = font(13);
+  series.forEach(s => { g.fillStyle = s.color; if (s.type==='line'){ g.fillRect(lx, 44, 18, 3); g.beginPath(); g.arc(lx+9, 45.5, 4, 0, 7); g.fill(); } else g.fillRect(lx, 38, 14, 14);
+    g.fillStyle = RC.muted; g.fillText(s.name, lx+22, 50); lx += 30 + g.measureText(s.name).width + 16; });
+  const L = horizontal ? 150 : 56, Rm = series.some(s=>s.axis===2) ? 50 : 20, T = 70, B = horizontal ? 28 : 56;
+  const pw = w-L-Rm, ph = h-T-B;
+  const bars = series.filter(s=>s.type!=='line' && s.axis!==2), lines = series.filter(s=>s.type==='line' || s.axis===2);
+  const niceMax = v => { if (v<=0) return 1; const m = Math.pow(10, Math.floor(Math.log10(v))); for (const k of [1,1.5,2,2.5,3,4,5,6,8,10]) if (k*m >= v) return k*m; return 10*m; };
+  const max1 = niceMax(Math.max(0, ...bars.flatMap(s=>s.values)) * 1.05), max2 = niceMax(Math.max(0, ...lines.flatMap(s=>s.values)) * 1.15);
+  g.font = font(12); g.strokeStyle = RC.line; g.fillStyle = RC.muted; g.lineWidth = 1;
+  for (let i=0;i<=4;i++){
+    const v = max1*i/4;
+    if (horizontal){ const x = L + pw*i/4; g.beginPath(); g.moveTo(x,T); g.lineTo(x,T+ph); g.stroke(); g.textAlign='center'; g.fillText(Math.round(v*10)/10, x, T+ph+18); }
+    else { const y = T + ph - ph*i/4; g.beginPath(); g.moveTo(L,y); g.lineTo(L+pw,y); g.stroke(); g.textAlign='right'; g.fillText(Math.round(v*10)/10, L-8, y+4);
+      if (lines.length){ g.textAlign='left'; g.fillText(Math.round(max2*i/4*10)/10, L+pw+8, y+4); } }
+  }
+  const n = labels.length, slot = (horizontal ? ph : pw)/Math.max(1,n), gw = slot*0.72, bw = gw/Math.max(1,bars.length);
+  labels.forEach((lab,i) => {
+    bars.forEach((s,j) => {
+      const v = s.values[i]||0, len = (horizontal ? pw : ph) * v/max1;
+      g.fillStyle = Array.isArray(s.colors) ? s.colors[i] : s.color;
+      if (horizontal){ const y = T + i*slot + (slot-gw)/2 + j*bw; g.fillRect(L, y, len, bw-2);
+        g.fillStyle = RC.ink; g.textAlign='left'; g.font = font(12,'600'); g.fillText(s.fmt ? s.fmt(v) : Math.round(v*10)/10, L+len+6, y+bw/2+4); g.font = font(12); }
+      else { const x = L + i*slot + (slot-gw)/2 + j*bw; g.fillRect(x+1, T+ph-len, bw-2, len); }
+    });
+    g.fillStyle = RC.muted; g.textAlign = horizontal ? 'right' : 'center';
+    if (horizontal) g.fillText(lab, L-10, T + i*slot + slot/2 + 4);
+    else { const x = L + i*slot + slot/2; if (n > 14){ g.save(); g.translate(x, T+ph+12); g.rotate(-0.6); g.textAlign='right'; g.fillText(lab,0,0); g.restore(); } else g.fillText(lab, x, T+ph+20); }
+  });
+  lines.forEach(s => {
+    g.strokeStyle = s.color; g.fillStyle = s.color; g.lineWidth = 2.5; g.beginPath();
+    s.values.forEach((v,i) => { const x = L + i*slot + slot/2, y = T+ph - ph*(v||0)/max2; i ? g.lineTo(x,y) : g.moveTo(x,y); }); g.stroke();
+    s.values.forEach((v,i) => { const x = L + i*slot + slot/2, y = T+ph - ph*(v||0)/max2; g.beginPath(); g.arc(x,y,4,0,7); g.fill(); });
+  });
+  g.strokeStyle = RC.muted; g.lineWidth = 1; g.beginPath(); g.moveTo(L,T); g.lineTo(L,T+ph); g.lineTo(L+pw,T+ph); g.stroke();
+  return cv.toDataURL('image/png');
+}
+function reportCharts(R){
+  const labels = R.buckets.map(b=>b.label), r1 = v => Math.round(v*10)/10;
+  const out = {
+    visits: chartPNG({title:'Visits and IEs', labels, series:[
+      {name:'Visits', values:R.buckets.map(b=>b.pts), color:RC.visit},
+      {name:'IEs', values:R.buckets.map(b=>b.nps), color:RC.ie, type:'line', axis:2}]}),
+    hours: chartPNG({title:'Hours worked vs allowed', labels, series:[
+      {name:'Clinician worked', values:R.buckets.map(b=>r1(b.clin)), color:RC.clin},
+      {name:'Clinician allowed', values:R.buckets.map(b=>r1(b.allowClin)), color:RC.clinSoft},
+      {name:'Aide worked', values:R.buckets.map(b=>r1(b.aide)), color:RC.aide},
+      {name:'Aide allowed', values:R.buckets.map(b=>r1(b.allowAide)), color:RC.aideSoft}]})
+  };
+  const cl = R.people.filter(p=>p.role==='clinician' && p.v!=null);
+  if (cl.length) out.people = chartPNG({title:'Visits by therapist', labels:cl.map(p=>p.name), horizontal:true, h:Math.max(220, 80+cl.length*44), series:[
+    {name:'Visits', values:cl.map(p=>p.v), color:RC.visit, fmt:v=>f0(v)}, {name:'IEs', values:cl.map(p=>p.ie), color:RC.ie, fmt:v=>f0(v)}]});
+  return out;
+}
+const dataURLBytes = u => Uint8Array.from(atob(u.split(',')[1]), ch => ch.charCodeAt(0));
+function downloadBlob(name, blob){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name.replace(/[\\/:*?"<>|]+/g,'-');
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const periodTitle = R => R.ptype==='day' ? R.p.label : `${R.p.label}`;
+const periodRange = R => R.ptype==='day' ? '' : `${md(R.p.start)}/${R.p.start.getFullYear()} to ${md(R.p.end)}/${R.p.end.getFullYear()}`;
+
+/* ----- PDF ----- */
+async function buildPDF(R, o){
+  await loadLib('pdf', () => window.PDFLib);
+  const {PDFDocument, StandardFonts, rgb} = PDFLib;
+  const doc = await PDFDocument.create();
+  const F = await doc.embedFont(StandardFonts.Helvetica), FB = await doc.embedFont(StandardFonts.HelveticaBold);
+  const col = hex => { const n = parseInt(hex.slice(1),16); return rgb((n>>16&255)/255, (n>>8&255)/255, (n&255)/255); };
+  const clean = s => String(s ?? '').replace(/[−–—]/g,'-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[^\x20-\x7E]/g,'');
+  const W = 792, H = 612, M = 36; let page, y, pageNo = 0;
+  const newPage = (heading) => {
+    page = doc.addPage([W,H]); pageNo++;
+    page.drawRectangle({x:0, y:H-54, width:W, height:54, color:col(RC.navy)});
+    page.drawText(clean(R.c.name), {x:M, y:H-24, size:10, font:F, color:rgb(0.75,0.82,0.92)});
+    page.drawText(clean(heading), {x:M, y:H-42, size:16, font:FB, color:rgb(1,1,1)});
+    const pl = clean(`${periodTitle(R)}${periodRange(R) ? '  |  '+periodRange(R) : ''}`);
+    page.drawText(pl, {x:W-M-F.widthOfTextAtSize(pl,10), y:H-38, size:10, font:F, color:rgb(0.75,0.82,0.92)});
+    y = H-80;
+  };
+  const text = (s, x, yy, {size=10, bold=false, color=RC.ink, align='left', w=0}={}) => {
+    const t = clean(s), f = bold ? FB : F, tw = f.widthOfTextAtSize(t, size);
+    const xx = align==='right' ? x + w - tw : align==='center' ? x + (w-tw)/2 : x;
+    page.drawText(t, {x:xx, y:yy, size, font:f, color:col(color)});
+  };
+  const ensure = (need, heading) => { if (y - need < 40) newPage(heading); };
+  const table = (heading, cols, rows, {size=9, rowH=17}={}) => {
+    const totalW = cols.reduce((a,c)=>a+c.w,0), sx = M + Math.max(0,(W-2*M-totalW)/2)*0;
+    const head = () => {
+      page.drawRectangle({x:sx, y:y-rowH+4, width:totalW, height:rowH, color:col(RC.band)});
+      let x = sx; cols.forEach(c => { text(c.h, x+5, y-rowH+9, {size:size-0.5, bold:true, color:RC.muted, align:c.align||'left', w:c.w-10}); x += c.w; });
+      y -= rowH;
+    };
+    ensure(rowH*3, heading); head();
+    rows.forEach((r,ri) => {
+      if (y - rowH < 40){ newPage(heading + ' (continued)'); head(); }
+      if (r.total) page.drawRectangle({x:sx, y:y-rowH+4, width:totalW, height:rowH, color:col('#E3EAF3')});
+      let x = sx;
+      cols.forEach((c,ci) => { const cell = r.cells[ci], v = cell && typeof cell==='object' ? cell : {v:cell};
+        text(v.v, x+5, y-rowH+9, {size, bold:!!(v.bold || r.total), color:v.color||RC.ink, align:c.align||'left', w:c.w-10}); x += c.w; });
+      page.drawLine({start:{x:sx, y:y-rowH+4}, end:{x:sx+totalW, y:y-rowH+4}, thickness:0.5, color:col(RC.line)});
+      y -= rowH;
+    });
+    y -= 14;
+  };
+  const image = async (url, maxW, maxH, heading) => {
+    const img = await doc.embedPng(dataURLBytes(url)); const s = Math.min(maxW/img.width, maxH/img.height);
+    ensure(img.height*s + 10, heading);
+    page.drawImage(img, {x:M, y:y-img.height*s, width:img.width*s, height:img.height*s}); y -= img.height*s + 14;
+  };
+  const charts = o.charts ? reportCharts(R) : {};
+  const vc = n => n>0.05 ? RC.over : n<-0.05 ? RC.under : RC.ink;
+  const chg = (cur, prev) => { const v = pctChange(cur, prev); return {v: v==null ? '-' : fmtPct(v), color: v==null ? RC.muted : v>0 ? RC.under : v<0 ? RC.over : RC.ink}; };
+
+  if (o.summary){
+    newPage('Budget summary');
+    const t = R.tot, tiles = [
+      ['Visits', f0(t.pts), RC.visit, o.change && R.hasPrev ? fmtPct(pctChange(t.pts, R.prev.pts)) : ''],
+      ['IEs', f0(t.nps), RC.ie, o.change && R.hasPrev ? fmtPct(pctChange(t.nps, R.prev.nps)) : ''],
+      ['Clinician hours', fmtHrs(t.clin), RC.ink, `${fmtHrs(t.allowClin)} allowed, ${fmtVar(t.overClin)}`],
+      ['Aide hours', fmtHrs(t.aide), RC.ink, `${fmtHrs(t.allowAide)} allowed, ${fmtVar(t.overAide)}`],
+      ['Visits per clinician hr', R.perHr.toFixed(2), RC.ink, `Target ${R.c.settings.ptsPerClinHr}`],
+      ['Census', R.census ?? '-', RC.ink, '']];
+    const tw = (W-2*M-5*10)/6;
+    tiles.forEach(([k,v,cl,sub],i) => {
+      const x = M + i*(tw+10);
+      page.drawRectangle({x, y:y-78, width:tw, height:78, color:col('#F6F9FC'), borderColor:col(RC.line), borderWidth:0.75});
+      text(k, x+10, y-18, {size:9, color:RC.muted});
+      text(v, x+10, y-46, {size:22, bold:true, color:cl});
+      if (sub) text(sub.length>34 ? sub.slice(0,34) : sub, x+10, y-64, {size:7.5, color: sub.includes('over') ? RC.over : sub.includes('under') ? RC.under : RC.muted});
+    });
+    if (o.change && R.hasPrev) text(`Change shown vs ${PREV_NAME[R.ptype]}`, M, y-92, {size:8, color:RC.muted});
+    y -= 110;
+    const cols = [{h:'Measure', w:240}, {h:'This period', w:130, align:'right'}];
+    if (o.change) cols.push({h:PREV_NAME[R.ptype][0].toUpperCase()+PREV_NAME[R.ptype].slice(1), w:130, align:'right'}, {h:'Change', w:90, align:'right'});
+    table('Budget summary', cols, summaryRows(R).map(r => ({cells:[
+      {v:r.k, color:r.color, bold:!!r.color},
+      {v:r.f(r.cur), color: r.variance ? vc(r.cur) : r.color, bold:!!r.color},
+      ...(o.change ? [{v: R.hasPrev ? r.f(r.prev) : '-', color:RC.muted}, r.variance || !R.hasPrev ? {v:''} : chg(r.cur, r.prev)] : [])]})));
+  }
+  if (o.trends){
+    newPage(`Trends by ${R.tp.buckets.length===7 ? 'day' : R.ptype==='month' ? 'week' : 'month'}`);
+    if (charts.visits){
+      const a1 = await doc.embedPng(dataURLBytes(charts.visits)), a2 = await doc.embedPng(dataURLBytes(charts.hours));
+      const cw = (W-2*M)/2-8, sc1 = Math.min(cw/a1.width, 210/a1.height), sc2 = Math.min(cw/a2.width, 210/a2.height), hh = Math.max(a1.height*sc1, a2.height*sc2);
+      page.drawImage(a1, {x:M, y:y-a1.height*sc1, width:a1.width*sc1, height:a1.height*sc1});
+      page.drawImage(a2, {x:W/2+4, y:y-a2.height*sc2, width:a2.width*sc2, height:a2.height*sc2});
+      y -= hh + 14;
+    }
+    table('Trends', [{h:'Period', w:110}, {h:'Visits', w:60, align:'right'}, {h:'IEs', w:50, align:'right'}, {h:'Clin hrs', w:70, align:'right'}, {h:'Allowed', w:70, align:'right'}, {h:'Over / under', w:90, align:'right'},
+      {h:'Aide hrs', w:70, align:'right'}, {h:'Allowed', w:70, align:'right'}, {h:'Over / under', w:90, align:'right'}],
+      [...R.buckets.map(b => ({cells:[b.label, {v:b.days?f0(b.pts):'', color:RC.visit, bold:true}, {v:b.days?f0(b.nps):'', color:RC.ie, bold:true}, b.days?fmtHrs(b.clin):'', b.days?fmtHrs(b.allowClin):'',
+        b.days?{v:fmtVar(b.overClin), color:vc(b.overClin)}:'', b.days?fmtHrs(b.aide):'', b.days?fmtHrs(b.allowAide):'', b.days?{v:fmtVar(b.overAide), color:vc(b.overAide)}:'']})),
+       {total:true, cells:['Total', {v:f0(R.tot.pts), color:RC.visit}, {v:f0(R.tot.nps), color:RC.ie}, fmtHrs(R.tot.clin), fmtHrs(R.tot.allowClin), {v:fmtVar(R.tot.overClin), color:vc(R.tot.overClin)}, fmtHrs(R.tot.aide), fmtHrs(R.tot.allowAide), {v:fmtVar(R.tot.overAide), color:vc(R.tot.overAide)}]}]);
+  }
+  if (o.people){
+    newPage('Therapist productivity');
+    const cols = [{h:'Name', w:120}, {h:'Role', w:70}, {h:'Hours', w:60, align:'right'}, {h:'PTO', w:50, align:'right'}, {h:'Visits', w:60, align:'right'}, {h:'IEs', w:45, align:'right'},
+      {h:'Visits / hr', w:70, align:'right'}, {h:'Allowed hrs', w:75, align:'right'}, {h:'Over / under', w:85, align:'right'}];
+    if (o.change) cols.push({h:'Visits change', w:85, align:'right'});
+    table('Therapist productivity', cols, R.people.map(p => ({cells:[{v:p.name, bold:true}, p.role==='clinician'?'Clinician':'Aide', fmtHrs(p.h), p.pto?fmtHrs(p.pto):'',
+      p.v!=null?{v:f0(p.v), color:RC.visit, bold:true}:(p.role==='clinician'?{v:'n/a', color:RC.muted}:''), p.v!=null?{v:f0(p.ie), color:RC.ie, bold:true}:'', p.vph!=null ? p.vph.toFixed(2) : '',
+      p.allowed!=null ? fmtHrs(p.allowed) : '', p.over!=null ? {v:fmtVar(p.over), color:vc(p.over)} : '', ...(o.change ? [p.v!=null && p.prevV!=null ? chg(p.v, p.prevV) : ''] : [])]})));
+    if (R.people.some(p=>p.role==='clinician' && (p.v==null || p.partial))) text('n/a: no visits recorded for this person. Visits by therapist come from imported schedules or visits entered per person in the daily log; productivity uses only those days.', M, y+4, {size:8, color:RC.muted});
+    if (charts.people){ y -= 10; await image(charts.people, W-2*M, Math.min(260, y-50), 'Therapist productivity'); }
+  }
+  if (o.daily){
+    newPage('Daily detail');
+    table('Daily detail', [{h:'Date', w:95}, {h:'Visits', w:55, align:'right'}, {h:'IEs', w:45, align:'right'}, {h:'Clin hrs', w:65, align:'right'}, {h:'Allowed', w:60, align:'right'}, {h:'Over / under', w:85, align:'right'},
+      {h:'Aide hrs', w:65, align:'right'}, {h:'Allowed', w:60, align:'right'}, {h:'Over / under', w:85, align:'right'}],
+      R.days.map(d => ({cells:[`${DOW[d.date.getDay()]} ${md(d.date)}`, {v:f0(d.pts), color:RC.visit, bold:true}, {v:f0(d.nps), color:RC.ie, bold:true}, fmtHrs(d.clin), fmtHrs(d.allowClin), {v:fmtVar(d.overClin), color:vc(d.overClin)},
+        fmtHrs(d.aide), fmtHrs(d.allowAide), {v:fmtVar(d.overAide), color:vc(d.overAide)}]})));
+    const st = R.staffInDays;
+    for (let g0=0; g0<st.length; g0+=9){
+      const grp = st.slice(g0, g0+9);
+      table('Hours by person', [{h:'Date', w:95}, ...grp.map(s=>({h:s.name.slice(0,12), w:66, align:'right'}))],
+        R.days.map(d => ({cells:[`${DOW[d.date.getDay()]} ${md(d.date)}`, ...grp.map(s => { const v = d.byStaff[s.id]; return v ? (fmtHrs(v.h) + (v.p ? ` (${fmtHrs(v.p)})` : '')) : ''; })]})), {size:8.5});
+    }
+  }
+  const total = doc.getPageCount(), made = new Date().toLocaleDateString();
+  doc.getPages().forEach((pg,i) => { pg.drawText(clean(`Page ${i+1} of ${total}`), {x:W-M-60, y:20, size:8, font:F, color:col(RC.muted)}); pg.drawText(clean(`Created ${made}`), {x:M, y:20, size:8, font:F, color:col(RC.muted)}); });
+  return new Blob([await doc.save()], {type:'application/pdf'});
+}
+
+/* ----- Excel (.xlsx), written directly ----- */
+async function buildXLSX(R, o){
+  await loadLib('zip', () => window.JSZip);
+  const styles = [], styleKey = {};
+  const st = (k) => { if (!(k in styleKey)){ styleKey[k] = styles.length; styles.push(k); } return styleKey[k]; };
+  // style keys: font|fill|numfmt|align
+  const FONTS = {n:'<font><sz val="11"/><name val="Calibri"/></font>', b:'<font><b/><sz val="11"/><name val="Calibri"/></font>',
+    h:'<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>', t:'<font><b/><sz val="16"/><color rgb="FF0B1F45"/><name val="Calibri"/></font>',
+    m:'<font><i/><sz val="10"/><color rgb="FF5B6B80"/><name val="Calibri"/></font>', v:'<font><b/><sz val="11"/><color rgb="FF0E9FB0"/><name val="Calibri"/></font>',
+    i:'<font><b/><sz val="11"/><color rgb="FFC08A00"/><name val="Calibri"/></font>', o:'<font><sz val="11"/><color rgb="FFC8324F"/><name val="Calibri"/></font>',
+    u:'<font><sz val="11"/><color rgb="FF1E9E6A"/><name val="Calibri"/></font>', k:'<font><b/><sz val="20"/><color rgb="FF1B2A3A"/><name val="Calibri"/></font>',
+    kv:'<font><b/><sz val="20"/><color rgb="FF0E9FB0"/><name val="Calibri"/></font>', ki:'<font><b/><sz val="20"/><color rgb="FFC08A00"/><name val="Calibri"/></font>'};
+  const FILLS = {x:'', h:'<fill><patternFill patternType="solid"><fgColor rgb="FF0B1F45"/><bgColor indexed="64"/></patternFill></fill>',
+    t:'<fill><patternFill patternType="solid"><fgColor rgb="FFE3EAF3"/><bgColor indexed="64"/></patternFill></fill>',
+    c:'<fill><patternFill patternType="solid"><fgColor rgb="FFF6F9FC"/><bgColor indexed="64"/></patternFill></fill>'};
+  const NUM = {g:0, i:1, d1:164, d2:2, p:165, v:166};
+  const fontKeys = Object.keys(FONTS), fillKeys = Object.keys(FILLS);
+  const S = (font='n', fill='x', nf='g', al='') => st(`${font}|${fill}|${nf}|${al}`);
+  const cell = (v, s) => ({v, s});
+  S();   // the first style is the workbook default
+  const sheets = [];
+  const sheet = (name, widths) => { const sh = {name, rows:[], widths, images:[], merges:[]}; sheets.push(sh); return sh; };
+  const headRow = (sh, labels) => sh.rows.push(labels.map((l,i) => cell(l, S('h','h','g', i ? 'r' : ''))));
+  const vs = n => n>0.05 ? 'o' : n<-0.05 ? 'u' : 'n';
+  const title = (sh, t, sub) => { sh.rows.push([cell(t, S('t'))]); sh.rows.push([cell(sub, S('m'))]); sh.rows.push([]); };
+  const sub = `${R.c.name}  |  ${periodTitle(R)}${periodRange(R) ? '  |  '+periodRange(R) : ''}`;
+  const charts = o.charts ? reportCharts(R) : {};
+
+  if (o.summary){
+    const sh = sheet('Summary', [32,16,16,12]);
+    title(sh, 'Budget summary', sub);
+    const t = R.tot;
+    sh.rows.push([cell('Visits', S('m')), cell('IEs', S('m')), cell('Clinician hours', S('m')), cell('Aide hours', S('m'))]);
+    sh.rows.push([cell(t.pts, S('kv','c','i')), cell(t.nps, S('ki','c','i')), cell(Math.round(t.clin*10)/10, S('k','c','d1')), cell(Math.round(t.aide*10)/10, S('k','c','d1'))]);
+    sh.rows.push([]);
+    const hdr = ['Measure', 'This period']; if (o.change) hdr.push(PREV_NAME[R.ptype][0].toUpperCase()+PREV_NAME[R.ptype].slice(1), 'Change');
+    headRow(sh, hdr);
+    summaryRows(R).forEach(r => {
+      const isInt = r.f===f0, nf = r.k.includes('per clinician') ? 'd2' : isInt ? 'i' : 'd1';
+      const font = r.k==='Visits' ? 'v' : r.k==='IEs' ? 'i' : r.variance ? vs(r.cur) : 'n';
+      const row = [cell(r.k, S(r.k==='Visits' ? 'v' : r.k==='IEs' ? 'i' : 'n')), cell(Math.round(r.cur*100)/100, S(font,'x', r.variance ? 'v' : nf, 'r'))];
+      if (o.change){ row.push(cell(R.hasPrev ? Math.round(r.prev*100)/100 : '', S('n','x', r.variance ? 'v' : nf, 'r')));
+        const pc = pctChange(r.cur, r.prev); row.push(cell(!r.variance && R.hasPrev && pc!=null ? pc : '', S(pc>0 ? 'u' : pc<0 ? 'o' : 'n','x','p','r'))); }
+      sh.rows.push(row);
+    });
+    sh.rows.push([]); sh.rows.push([cell('Over / under: positive numbers are hours over the allowed amount, negative numbers are under.', S('m'))]);
+    if (charts.visits) sh.images.push({url:charts.visits, col:5, row:1, w:560, h:280}, {url:charts.hours, col:5, row:16, w:560, h:280});
+  }
+  if (o.trends){
+    const sh = sheet('Trends', [16,10,8,13,10,19,10,10,19]);
+    title(sh, 'Trends', sub);
+    headRow(sh, ['Period','Visits','IEs','Clinician hrs','Allowed','Over (+) / under (-)','Aide hrs','Allowed','Over (+) / under (-)']);
+    const r2 = n => Math.round(n*10)/10;
+    R.buckets.forEach(b => sh.rows.push(b.days ? [cell(b.label), cell(b.pts, S('v','x','i','r')), cell(b.nps, S('i','x','i','r')), cell(r2(b.clin), S('n','x','d1','r')), cell(r2(b.allowClin), S('n','x','d1','r')),
+      cell(r2(b.overClin), S(vs(b.overClin),'x','v','r')), cell(r2(b.aide), S('n','x','d1','r')), cell(r2(b.allowAide), S('n','x','d1','r')), cell(r2(b.overAide), S(vs(b.overAide),'x','v','r'))] : [cell(b.label), cell('No entries', S('m'))]));
+    const t = R.tot;
+    sh.rows.push([cell('Total', S('b','t')), cell(t.pts, S('v','t','i','r')), cell(t.nps, S('i','t','i','r')), cell(r2(t.clin), S('b','t','d1','r')), cell(r2(t.allowClin), S('b','t','d1','r')),
+      cell(r2(t.overClin), S(vs(t.overClin),'t','v','r')), cell(r2(t.aide), S('b','t','d1','r')), cell(r2(t.allowAide), S('b','t','d1','r')), cell(r2(t.overAide), S(vs(t.overAide),'t','v','r'))]);
+    if (charts.visits) sh.images.push({url:charts.visits, col:10, row:1, w:560, h:280}, {url:charts.hours, col:10, row:16, w:560, h:280});
+  }
+  if (o.people){
+    const sh = sheet('Therapists', [18,11,9,8,9,8,11,12,19,14]);
+    title(sh, 'Therapist productivity', sub);
+    const hdr = ['Name','Role','Hours','PTO','Visits','IEs','Visits / hr','Allowed hrs','Over (+) / under (-)']; if (o.change) hdr.push('Visits change');
+    headRow(sh, hdr);
+    const r2 = n => Math.round(n*100)/100;
+    R.people.forEach(p => { const cl = p.role==='clinician';
+      const row = [cell(p.name, S('b')), cell(cl?'Clinician':'Aide'), cell(r2(p.h), S('n','x','d1','r')), cell(p.pto ? r2(p.pto) : '', S('n','x','d1','r')),
+        cell(p.v ?? (cl ? 'n/a' : ''), S(p.v!=null ? 'v' : 'm','x','i','r')), cell(p.ie ?? '', S('i','x','i','r')), cell(p.vph!=null ? r2(p.vph) : '', S('n','x','d2','r')),
+        cell(p.allowed!=null ? r2(p.allowed) : '', S('n','x','d1','r')), cell(p.over!=null ? r2(p.over) : '', S(p.over!=null ? vs(p.over) : 'n','x','v','r'))];
+      if (o.change){ const pc = p.v!=null && p.prevV!=null ? pctChange(p.v, p.prevV) : null; row.push(cell(pc==null ? '' : pc, S(pc>0?'u':pc<0?'o':'n','x','p','r'))); }
+      sh.rows.push(row); });
+    if (charts.people) sh.images.push({url:charts.people, col:12, row:1, w:560, h:Math.round(560*Math.max(220, 80+R.people.filter(p=>p.role==='clinician' && p.v!=null).length*44)/760)});
+  }
+  if (o.daily){
+    const sh = sheet('Daily detail', [16,9,7,13,10,19,10,10,19, ...R.staffInDays.map(()=>11)]);
+    title(sh, 'Daily detail', sub + '  |  Hours by person include PTO in a separate column on the right');
+    headRow(sh, ['Date','Visits','IEs','Clinician hrs','Allowed','Over (+) / under (-)','Aide hrs','Allowed','Over (+) / under (-)', ...R.staffInDays.map(s=>s.name)]);
+    const r2 = n => Math.round(n*10)/10;
+    R.days.forEach(d => sh.rows.push([cell(`${DOW[d.date.getDay()]} ${md(d.date)}/${d.date.getFullYear()}`), cell(d.pts, S('v','x','i','r')), cell(d.nps, S('i','x','i','r')),
+      cell(r2(d.clin), S('n','x','d1','r')), cell(r2(d.allowClin), S('n','x','d1','r')), cell(r2(d.overClin), S(vs(d.overClin),'x','v','r')),
+      cell(r2(d.aide), S('n','x','d1','r')), cell(r2(d.allowAide), S('n','x','d1','r')), cell(r2(d.overAide), S(vs(d.overAide),'x','v','r')),
+      ...R.staffInDays.map(s => { const v = d.byStaff[s.id]; return cell(v && v.h ? r2(v.h) : '', S('n','x','d1','r')); })]));
+    if (R.staffInDays.some(s => R.days.some(d => d.byStaff[s.id]?.p))){
+      sh.rows.push([]); sh.rows.push([cell('PTO hours by person', S('b'))]);
+      headRow(sh, ['Date', ...R.staffInDays.map(s=>s.name)]);
+      R.days.forEach(d => sh.rows.push([cell(`${DOW[d.date.getDay()]} ${md(d.date)}`), ...R.staffInDays.map(s => cell(d.byStaff[s.id]?.p || '', S('n','x','d1','r')))]));
+    }
+  }
+
+  // ---- assemble the workbook files
+  const X = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const colName = i => { let s=''; i++; while (i){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=(i-m-1)/26; } return s; };
+  const zip = new JSZip();
+  const xfs = styles.map(k => { const [fo,fi,nf,al] = k.split('|');
+    return `<xf numFmtId="${NUM[nf]}" fontId="${fontKeys.indexOf(fo)}" fillId="${fi==='x' ? 0 : 1+fillKeys.indexOf(fi)}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyNumberFormat="1"${al ? ' applyAlignment="1"><alignment horizontal="right"/></xf>' : '/>'}`; });
+  zip.file('xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="3"><numFmt numFmtId="164" formatCode="0.0"/><numFmt numFmtId="165" formatCode="+0%;-0%;0%"/><numFmt numFmtId="166" formatCode="+0.0;-0.0;0.0"/></numFmts>
+<fonts count="${fontKeys.length}">${fontKeys.map(k=>FONTS[k]).join('')}</fonts>
+<fills count="${fillKeys.length+1}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fillKeys.slice(1).map(k=>FILLS[k]).join('')}</fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs></styleSheet>`);
+  let imgN = 0;
+  sheets.forEach((sh, si) => {
+    const n = si+1;
+    const rowsXml = sh.rows.map((r, ri) => `<row r="${ri+1}">${r.map((c, ci) => {
+      if (c==null || c.v==='' || c.v==null){ return c && c.s ? `<c r="${colName(ci)}${ri+1}" s="${c.s}"/>` : ''; }
+      const ref = `${colName(ci)}${ri+1}`, s = c.s ? ` s="${c.s}"` : '';
+      return typeof c.v==='number' ? `<c r="${ref}"${s}><v>${c.v}</v></c>` : `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${X(c.v)}</t></is></c>`;
+    }).join('')}</row>`).join('');
+    const colsXml = `<cols>${sh.widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols>`;
+    const hasImg = sh.images.length;
+    zip.file(`xl/worksheets/sheet${n}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>${colsXml}<sheetData>${rowsXml}</sheetData><pageSetup orientation="landscape"/>${hasImg ? '<drawing r:id="rId1"/>' : ''}</worksheet>`);
+    if (hasImg){
+      zip.file(`xl/worksheets/_rels/sheet${n}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${n}.xml"/></Relationships>`);
+      const rels = [], anchors = [];
+      sh.images.forEach((im, k) => { imgN++; zip.file(`xl/media/image${imgN}.png`, dataURLBytes(im.url));
+        rels.push(`<Relationship Id="rId${k+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${imgN}.png"/>`);
+        anchors.push(`<xdr:oneCellAnchor><xdr:from><xdr:col>${im.col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${im.row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="${im.w*9525}" cy="${im.h*9525}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${k+2}" name="Chart ${k+1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId${k+1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${im.w*9525}" cy="${im.h*9525}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`); });
+      zip.file(`xl/drawings/drawing${n}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${anchors.join('')}</xdr:wsDr>`);
+      zip.file(`xl/drawings/_rels/drawing${n}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}</Relationships>`);
+    }
+  });
+  zip.file('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sh,i)=>`<sheet name="${X(sh.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`);
+  zip.file('xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((sh,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
+  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((sh,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>${sh.images.length ? `<Override PartName="/xl/drawings/drawing${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>` : ''}`).join('')}</Types>`);
+  return await zip.generateAsync({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+/* ----- PowerPoint ----- */
+async function buildPPTX(R, o){
+  await loadLib('pptx', () => window.PptxGenJS);
+  const pptx = new PptxGenJS(); pptx.layout = 'LAYOUT_WIDE'; pptx.title = `${R.c.name} report`;
+  const H = c => c.replace('#','');
+  const FONT = 'Segoe UI';
+  const frame = (heading) => {
+    const s = pptx.addSlide(); s.background = {color:'FFFFFF'};
+    s.addShape(pptx.ShapeType.rect, {x:0, y:0, w:13.33, h:0.9, fill:{color:H(RC.navy)}});
+    s.addText(heading, {x:0.5, y:0.12, w:8.5, h:0.66, fontFace:FONT, fontSize:24, bold:true, color:'FFFFFF'});
+    s.addText(`${R.c.name}  |  ${periodTitle(R)}`, {x:8.3, y:0.12, w:4.6, h:0.66, fontFace:FONT, fontSize:12, color:'C0D0E8', align:'right'});
+    return s;
+  };
+  let icon = null;
+  try { const r = await fetch('kpi-icon-192.png'); if (r.ok){ const b = await r.blob(); icon = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); }); } } catch(e){}
+  // title slide
+  const t0 = pptx.addSlide(); t0.background = {color:H(RC.navy)};
+  if (icon) t0.addImage({data:icon, x:0.8, y:1.2, w:1.4, h:1.4});
+  t0.addText('Clinic staffing report', {x:0.8, y:2.8, w:11, h:0.9, fontFace:FONT, fontSize:40, bold:true, color:'FFFFFF'});
+  t0.addText(R.c.name, {x:0.8, y:3.7, w:11, h:0.6, fontFace:FONT, fontSize:22, color:'4DF5A0'});
+  t0.addText(`${periodTitle(R)}${periodRange(R) ? '   ('+periodRange(R)+')' : ''}`, {x:0.8, y:4.3, w:11, h:0.5, fontFace:FONT, fontSize:16, color:'C0D0E8'});
+  t0.addText(`Created ${new Date().toLocaleDateString()}`, {x:0.8, y:6.6, w:6, h:0.4, fontFace:FONT, fontSize:11, color:'8FA3C0'});
+  const r1 = v => Math.round(v*10)/10;
+  if (o.summary){
+    const s = frame('Budget summary'), t = R.tot;
+    const chgTxt = (cur, prev) => o.change && R.hasPrev ? (fmtPct(pctChange(cur, prev)) ? `${fmtPct(pctChange(cur, prev))} vs ${PREV_NAME[R.ptype]}` : '') : '';
+    const tiles = [
+      ['Visits', f0(t.pts), RC.visit, chgTxt(t.pts, R.prev.pts)], ['IEs', f0(t.nps), RC.ie, chgTxt(t.nps, R.prev.nps)],
+      ['Clinician hours', fmtHrs(t.clin), RC.ink, `${fmtHrs(t.allowClin)} allowed  |  ${fmtVar(t.overClin)}`],
+      ['Aide hours', fmtHrs(t.aide), RC.ink, `${fmtHrs(t.allowAide)} allowed  |  ${fmtVar(t.overAide)}`],
+      ['Visits per clinician hour', R.perHr.toFixed(2), RC.ink, `Target ${R.c.settings.ptsPerClinHr}${chgTxt(R.perHr, R.prevPerHr) ? '  |  '+chgTxt(R.perHr, R.prevPerHr) : ''}`],
+      ['Census', String(R.census ?? '-'), RC.ink, 'Active patients']];
+    tiles.forEach(([k,v,cl,sub],i) => {
+      const x = 0.5 + (i%3)*4.15, y = 1.25 + Math.floor(i/3)*2.65;
+      s.addShape(pptx.ShapeType.roundRect, {x, y, w:3.9, h:2.4, fill:{color:'F6F9FC'}, line:{color:H(RC.line), width:1}, rectRadius:0.08});
+      s.addText(k, {x:x+0.25, y:y+0.2, w:3.4, h:0.4, fontFace:FONT, fontSize:14, color:H(RC.muted)});
+      s.addText(v, {x:x+0.25, y:y+0.65, w:3.4, h:1.0, fontFace:FONT, fontSize:44, bold:true, color:H(cl)});
+      s.addText(sub, {x:x+0.25, y:y+1.7, w:3.5, h:0.45, fontFace:FONT, fontSize:12, color:H(sub.includes('over') ? RC.over : sub.includes('under') ? RC.under : RC.muted)});
+    });
+  }
+  if (o.trends){
+    const s = frame(`Trends by ${R.tp.buckets.length===7 ? 'day' : R.ptype==='month' ? 'week' : 'month'}`);
+    const labels = R.buckets.map(b=>b.label);
+    if (o.charts){
+      s.addChart(pptx.ChartType.bar, [{name:'Visits', labels, values:R.buckets.map(b=>b.pts)}, {name:'IEs', labels, values:R.buckets.map(b=>b.nps)}],
+        {x:0.4, y:1.1, w:6.2, h:3.6, chartColors:[H(RC.visit), H(RC.ie)], showLegend:true, legendPos:'t', showTitle:true, title:'Visits and IEs', titleFontSize:14, catAxisLabelFontSize:10, valAxisLabelFontSize:10, showValue:true, dataLabelFontSize:9});
+      s.addChart(pptx.ChartType.bar, [{name:'Clinician worked', labels, values:R.buckets.map(b=>r1(b.clin))}, {name:'Clinician allowed', labels, values:R.buckets.map(b=>r1(b.allowClin))},
+        {name:'Aide worked', labels, values:R.buckets.map(b=>r1(b.aide))}, {name:'Aide allowed', labels, values:R.buckets.map(b=>r1(b.allowAide))}],
+        {x:6.75, y:1.1, w:6.2, h:3.6, chartColors:[H(RC.clin), H(RC.clinSoft), H(RC.aide), H(RC.aideSoft)], showLegend:true, legendPos:'t', showTitle:true, title:'Hours worked vs allowed', titleFontSize:14, catAxisLabelFontSize:10, valAxisLabelFontSize:10});
+    }
+    const hdr = ['Period','Visits','IEs','Clin hrs','Allowed','Over / under','Aide hrs','Allowed','Over / under'].map(x => ({text:x, options:{bold:true, color:'FFFFFF', fill:{color:H(RC.navy)}}}));
+    const vcol = n => H(n>0.05 ? RC.over : n<-0.05 ? RC.under : RC.ink);
+    const rows = R.buckets.slice(0, o.charts ? 8 : 18).map(b => [b.label, {text:b.days?f0(b.pts):'', options:{color:H(RC.visit), bold:true}}, {text:b.days?f0(b.nps):'', options:{color:H(RC.ie), bold:true}},
+      b.days?fmtHrs(b.clin):'', b.days?fmtHrs(b.allowClin):'', {text:b.days?fmtVar(b.overClin):'', options:{color:vcol(b.overClin)}}, b.days?fmtHrs(b.aide):'', b.days?fmtHrs(b.allowAide):'', {text:b.days?fmtVar(b.overAide):'', options:{color:vcol(b.overAide)}}]);
+    rows.push([{text:'Total', options:{bold:true}}, {text:f0(R.tot.pts), options:{bold:true, color:H(RC.visit)}}, {text:f0(R.tot.nps), options:{bold:true, color:H(RC.ie)}}, {text:fmtHrs(R.tot.clin), options:{bold:true}}, {text:fmtHrs(R.tot.allowClin), options:{bold:true}},
+      {text:fmtVar(R.tot.overClin), options:{bold:true, color:vcol(R.tot.overClin)}}, {text:fmtHrs(R.tot.aide), options:{bold:true}}, {text:fmtHrs(R.tot.allowAide), options:{bold:true}}, {text:fmtVar(R.tot.overAide), options:{bold:true, color:vcol(R.tot.overAide)}}]);
+    s.addTable([hdr, ...rows], {x:0.4, y:o.charts ? 4.85 : 1.2, w:12.5, fontFace:FONT, fontSize:o.charts ? 9 : 11, border:{type:'solid', color:H(RC.line), pt:0.5}, rowH:0.24, autoPage:false});
+  }
+  if (o.people){
+    const s = frame('Therapist productivity');
+    const cl = R.people.filter(p=>p.role==='clinician' && p.v!=null);
+    const vcol = n => H(n>0.05 ? RC.over : n<-0.05 ? RC.under : RC.ink);
+    const hdrs = ['Name','Hours','Visits','IEs','Visits / hr','Allowed hrs','Over / under', ...(o.change ? ['Visits change'] : [])];
+    const rows = R.people.map(p => { const c = p.role==='clinician'; return [{text:p.name + (c ? '' : ' (aide)'), options:{bold:true}}, fmtHrs(p.h), {text:p.v!=null?f0(p.v):(c?'n/a':''), options:{color:H(p.v!=null?RC.visit:RC.muted), bold:p.v!=null}}, {text:p.ie!=null?f0(p.ie):'', options:{color:H(RC.ie), bold:true}},
+      p.vph!=null ? p.vph.toFixed(2) : '', p.allowed!=null ? fmtHrs(p.allowed) : '', {text:p.over!=null ? fmtVar(p.over) : '', options:{color:p.over!=null ? vcol(p.over) : H(RC.ink)}},
+      ...(o.change ? [p.v!=null && p.prevV!=null ? fmtPct(pctChange(p.v, p.prevV)) || '-' : ''] : [])]; });
+    const narrow = o.charts && cl.length, base = [1.6,0.75,0.75,0.6,0.9,0.95,1.25, ...(o.change ? [0.9] : [])];
+    const scale = (narrow ? 7.4 : 12.5) / base.reduce((a,b)=>a+b,0), colW = base.map(v => Math.round(v*scale*100)/100);
+    s.addTable([hdrs.map(x => ({text:x, options:{bold:true, color:'FFFFFF', fill:{color:H(RC.navy)}}})), ...rows.slice(0,14)],
+      {x:0.4, y:1.15, w:colW.reduce((a,b)=>a+b,0), colW, fontFace:FONT, fontSize:11, border:{type:'solid', color:H(RC.line), pt:0.5}, rowH:0.32, autoPage:false});
+    const rc = [...cl].reverse();
+    if (o.charts && cl.length) s.addChart(pptx.ChartType.bar, [{name:'Visits', labels:rc.map(p=>p.name), values:rc.map(p=>p.v)}, {name:'IEs', labels:rc.map(p=>p.name), values:rc.map(p=>p.ie)}],
+      {x:8.0, y:1.15, w:4.95, h:5.6, barDir:'bar', chartColors:[H(RC.visit), H(RC.ie)], showLegend:true, legendPos:'t', showTitle:true, title:'Visits by therapist', titleFontSize:14, showValue:true, dataLabelFontSize:10, catAxisLabelFontSize:11});
+  }
+  if (o.daily){
+    const vcol = n => H(n>0.05 ? RC.over : n<-0.05 ? RC.under : RC.ink);
+    const hdr = ['Date','Visits','IEs','Clin hrs','Allowed','Over / under','Aide hrs','Allowed','Over / under'].map(x => ({text:x, options:{bold:true, color:'FFFFFF', fill:{color:H(RC.navy)}}}));
+    const per = 16;
+    for (let i=0; i<Math.max(1, R.days.length); i+=per){
+      const s = frame(R.days.length > per ? `Daily detail (${Math.floor(i/per)+1} of ${Math.ceil(R.days.length/per)})` : 'Daily detail');
+      const rows = R.days.slice(i, i+per).map(d => [`${DOW[d.date.getDay()]} ${md(d.date)}`, {text:f0(d.pts), options:{color:H(RC.visit), bold:true}}, {text:f0(d.nps), options:{color:H(RC.ie), bold:true}},
+        fmtHrs(d.clin), fmtHrs(d.allowClin), {text:fmtVar(d.overClin), options:{color:vcol(d.overClin)}}, fmtHrs(d.aide), fmtHrs(d.allowAide), {text:fmtVar(d.overAide), options:{color:vcol(d.overAide)}}]);
+      s.addTable([hdr, ...rows], {x:0.4, y:1.15, w:12.5, fontFace:FONT, fontSize:11, border:{type:'solid', color:H(RC.line), pt:0.5}, rowH:0.33, autoPage:false});
+    }
+  }
+  return await pptx.write({outputType:'blob'});
+}
+
+/* ----- the Share report dialog ----- */
+function openReportDialog(){
+  const c = clinic();
+  const o = c.settings.report = Object.assign({summary:true, trends:true, people:true, daily:true, charts:true, change:true}, c.settings.report || {});
+  const p = periodInfo(ui.ptype, ui.anchor);
+  let dlg = $('#rptDlg'); if (dlg) dlg.remove();
+  dlg = document.createElement('dialog'); dlg.id = 'rptDlg'; dlg.className = 'rptdlg';
+  const box = (k, label, hint) => `<label class="opt"><input type="checkbox" data-ro="${k}" ${o[k]?'checked':''}><span><b>${label}</b><small>${hint}</small></span></label>`;
+  dlg.innerHTML = `
+    <form method="dialog" class="rptin">
+      <div class="hd"><h2>Share a report</h2><button class="btn icon" value="cancel" aria-label="Close">×</button></div>
+      <p class="sub" style="margin:0 0 14px">${esc(c.name)}, ${esc(p.label)}. Change the period on the dashboard to report on a different one.</p>
+      <h3>Include</h3>
+      ${box('summary','Budget summary','Visits, IEs, hours vs allowed, visits per clinician hour')}
+      ${box('trends','Trends', ui.ptype==='day' ? 'Each day of this week' : ui.ptype==='week' ? 'Each day of the week' : ui.ptype==='month' ? 'Each week of the month' : 'Each month')}
+      ${box('people','Therapist productivity','Hours, visits, IEs, and visits per hour for each person')}
+      ${box('daily','Daily detail','Every day in the period, with hours by person')}
+      <h3>Extras</h3>
+      ${box('charts','Charts','Color coded: visits in teal, IEs in gold')}
+      ${box('change','Change vs last period', `Percent up or down compared with ${PREV_NAME[ui.ptype]}`)}
+      <h3>Download as</h3>
+      <div class="fmts">
+        <button class="btn primary" type="button" data-fmt="pdf">PDF</button>
+        <button class="btn primary" type="button" data-fmt="xlsx">Excel</button>
+        <button class="btn primary" type="button" data-fmt="pptx">PowerPoint</button>
+      </div>
+      <p class="hint" id="rptMsg" role="status"></p>
+    </form>`;
+  document.body.appendChild(dlg); dlg.showModal();
+  dlg.querySelectorAll('[data-ro]').forEach(b => b.onchange = () => { o[b.dataset.ro] = b.checked; persist(); });
+  dlg.querySelectorAll('[data-fmt]').forEach(b => b.onclick = async () => {
+    if (!['summary','trends','people','daily'].some(k=>o[k])){ $('#rptMsg').textContent = 'Pick at least one section to include.'; return; }
+    const fmt = b.dataset.fmt, R = reportData(c, ui.ptype, ui.anchor);
+    if (!R.tot.days){ $('#rptMsg').textContent = 'Nothing is logged for this period yet.'; return; }
+    dlg.querySelectorAll('[data-fmt]').forEach(x => x.disabled = true);
+    $('#rptMsg').textContent = 'Building your report…';
+    try {
+      const blob = fmt==='pdf' ? await buildPDF(R, o) : fmt==='xlsx' ? await buildXLSX(R, o) : await buildPPTX(R, o);
+      downloadBlob(`${c.name} - ${R.p.label} report.${fmt}`, blob);
+      $('#rptMsg').textContent = 'Downloaded. Check your Downloads folder.';
+    } catch(e){
+      console.error(e);
+      $('#rptMsg').textContent = e.message==='lib' ? "The report builder couldn't load. Connect to the internet once and try again." : 'Something went wrong building the report. Try again, or try another format.';
+    } finally { dlg.querySelectorAll('[data-fmt]').forEach(x => x.disabled = false); }
+  });
+  dlg.addEventListener('close', () => dlg.remove());
 }
 
 /* ---------- boot ---------- */

@@ -1,5 +1,5 @@
 // Clinic Tracker service worker: always tries the internet first, uses saved copies only when offline.
-const CACHE = 'clinic-tracker-v12';
+const CACHE = 'clinic-tracker-v14';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
