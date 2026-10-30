@@ -250,6 +250,19 @@ details summary{cursor:pointer;font-weight:600}
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+/* ---------- if anything breaks, show it instead of a blank page ---------- */
+function showFatal(err){
+  const m = document.getElementById('main'); if (!m) return;
+  let raw = ''; try { raw = localStorage.getItem('clinic-tracker:data') || ''; } catch(e){}
+  m.innerHTML = `<section class="panel" style="max-width:640px;margin:40px auto;background:#0A1F45;color:#E8F2FF;border:1px solid #1F3D73;border-radius:18px;padding:22px">
+    <h2 style="margin:0 0 8px">The app hit a problem while opening</h2>
+    <p style="color:#93ACD3;margin:0 0 12px">Your entries are still saved on this device. Send this message to whoever set up the app:</p>
+    <pre style="white-space:pre-wrap;background:#03122B;padding:10px;border-radius:8px;font-size:12px;color:#FF9EB5">${String(err && (err.stack || err.message) || err).replace(/[<>&]/g,'')}</pre>
+    <p><button class="btn primary" onclick="location.reload()">Try again</button>
+    ${raw ? `<a class="btn" style="margin-left:8px" download="clinic-tracker-backup.json" href="${URL.createObjectURL(new Blob([raw],{type:'application/json'}))}">Download backup</a>` : ''}</p></section>`;
+}
+window.addEventListener('error', ev => { const m = document.getElementById('main'); if (m && (!m.children.length || m.querySelector('.loading'))) showFatal(ev.error || ev.message); });
+window.addEventListener('unhandledrejection', ev => { const m = document.getElementById('main'); if (m && m.querySelector('.loading')) showFatal(ev.reason); });
 /* ---------- utilities ---------- */
 const KEY = 'clinic-tracker:data';
 const $ = s => document.querySelector(s);
@@ -439,7 +452,10 @@ function renderShell(){
   $('#footNote').innerHTML = `Allowed clinician hours = patients ÷ ${c.settings.ptsPerClinHr}<br>Allowed aide hours = patients × ${c.settings.aideHrsPerPt}`;
 }
 function render(){
-  charts.splice(0).forEach(ch=>ch.destroy());
+  try { renderInner(); } catch(e){ console.error(e); showFatal(e); }
+}
+function renderInner(){
+  charts.splice(0).forEach(ch=>{ try { ch.destroy(); } catch(e){} });
   renderShell();
   ({dash:renderDashboard, log:renderLog, import:renderImport, staff:renderStaff, settings:renderSettings})[ui.view]();
   window.scrollTo({top:0});
