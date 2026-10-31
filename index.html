@@ -965,7 +965,7 @@ function analyzeSchedule(cv){
       if (x<mnx) mnx=x; if (x>mxx) mxx=x; if (y<mny) mny=y; if (y>mxy) mxy=y;
       for (const k of [j-1,j+1,j-RW,j+RW]) if (k>=0 && k<M.length && M[k] && !seen[k] && Math.abs((k%RW)-x)<=1){ seen[k]=1; st.push(k); } }
     const w = mxx-mnx+1, h = mxy-mny+1;
-    if (h<0.42*S || h>0.95*S || w<0.42*S || w>4*S) continue;
+    if (h<0.32*S || h>0.95*S || w<0.32*S || w>4*S || h < 6) continue;
     const gx0 = mnx+rx0, gy0 = mny+ry0, gy1 = mxy+ry0, side = Math.min(w,h);
     let sr=0,sg=0,sb=0,n=0;
     for (const j of pix){ if (j%RW - mnx < side){ const p = px(j%RW+rx0, ((j/RW)|0)+ry0); sr+=p[0]; sg+=p[1]; sb+=p[2]; n++; } }
@@ -976,8 +976,17 @@ function analyzeSchedule(cv){
     if (hue==='green' && light/tt > 0.08) continue;           // payment coin, not a status icon
     const lp = k => { const p = px(Math.max(0,gx0-k), cy); return chr(p)<45 && lm(p)>140 && lm(p)<238; };
     if (!(lp(1)||lp(2)||lp(3))) continue;                     // flags and coins sit beside the status icon
-    if (cands.some(c => Math.abs(c.y0-gy0)<0.3*S && Math.abs(c.x0-gx0)<0.5*S)) continue;
     cands.push({x0:gx0, y0:gy0, y1:gy1, h, hue});
+  }
+  // status icons are all the same size; keep only those (drops flags and other small marks)
+  {
+    const hh = {}; cands.forEach(c => { hh[c.h] = (hh[c.h]||0) + 1; });
+    let mode = 0, mc = 0; for (const [k,v] of Object.entries(hh)){ const n = v + (hh[+k-1]||0) + (hh[+k+1]||0); if (n > mc){ mc = n; mode = +k; } }
+    const kept = [];
+    cands.filter(c => c.h >= mode*0.8 && c.h <= mode*1.25).sort((a,b)=>a.y0-b.y0 || a.x0-b.x0).forEach(c => {
+      if (!kept.some(k => Math.abs(k.y0-c.y0) < 0.5*mode && Math.abs(k.x0-c.x0) < 0.8*mode)) kept.push(c);
+    });
+    cands.length = 0; cands.push(...kept);
   }
 
   // 5. each appointment's length and color
